@@ -1,0 +1,2202 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FFN — Journal de bord</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --navy:#0A1628; --blue:#1B4F8A; --blue-light:#2563C4;
+    --accent:#E8632A; --accent2:#F0A500;
+    --purple:#6B3FA0; --teal:#0E7C7B;
+    --surface:#fff; --surface2:#F4F6FA; --surface3:#EBF0F8;
+    --border:#DDE3EE; --text:#0A1628; --muted:#5A6478; --hint:#9AA3B5;
+    --success:#1A7A4A; --error:#C0392B; --r:10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--surface2); color: var(--text); min-height: 100vh; }
+
+  /* ── HEADER ── */
+  .header { background: var(--navy); padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; height: 52px; position: sticky; top: 0; z-index: 100; }
+  .header-brand { display: flex; align-items: center; gap: 10px; }
+  .header-logo { width: 28px; height: 28px; background: var(--accent); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; }
+  .header-logo.staff { background: var(--teal); }
+  .header-title { color: #fff; font-size: 14px; font-weight: 500; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .coach-name { color: rgba(255,255,255,0.7); font-size: 12px; }
+  .role-badge { font-size: 11px; padding: 3px 8px; border-radius: 4px; background: rgba(14,124,123,0.3); color: #6FDFD8; display: none; }
+  .role-badge.visible { display: inline; }
+  .save-status { font-size: 11px; padding: 3px 8px; border-radius: 4px; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); }
+  .save-status.saved { background: rgba(26,122,74,0.3); color: #6FDFA5; }
+
+  /* ── SETUP ── */
+  .setup-screen { min-height: calc(100vh - 52px); display: flex; align-items: center; justify-content: center; padding: 2rem; }
+  .setup-card { background: var(--surface); border-radius: 14px; padding: 2rem; width: 100%; max-width: 480px; box-shadow: 0 4px 24px rgba(10,22,40,0.08); }
+  .setup-logo { width: 48px; height: 48px; background: var(--navy); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.25rem; }
+  .setup-title { font-size: 20px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
+  .setup-sub { font-size: 13px; color: var(--muted); margin-bottom: 1.5rem; }
+  .role-indicator { display: none; margin-top: 8px; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 500; }
+  .role-indicator.entraineur { background: #FFF3EE; color: var(--accent); border: 1px solid #F5C9B3; display: block; }
+  .role-indicator.staff { background: #E0F3F2; color: var(--teal); border: 1px solid #A3D8D7; display: block; }
+
+  /* ── JOURNAL WRAP ── */
+  .journal-wrap { max-width: 780px; margin: 0 auto; padding: 1.5rem; display: none; }
+
+  /* ── DAY BAR ── */
+  .day-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: .75rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .day-bar label { font-size: 12px; color: var(--muted); white-space: nowrap; font-weight: 500; }
+  .day-bar input[type=date] { flex: 1; min-width: 150px; }
+  .day-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+  .badge-comp    { background: var(--accent); color: #fff; }
+  .badge-precomp { background: var(--purple); color: #fff; }
+  .badge-postcomp{ background: var(--success); color: #fff; }
+  .badge-staff   { background: var(--teal);   color: #fff; }
+
+  /* ── PHASE BANNER ── */
+  .phase-banner { border-radius: var(--r); padding: 10px 14px; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; }
+  .phase-banner.precomp  { background: #EDE9F8; color: var(--purple); border: 1px solid #C9BAE8; }
+  .phase-banner.comp     { background: #FFF3EE; color: var(--accent);  border: 1px solid #F5C9B3; }
+  .phase-banner.postcomp { background: #E6F6ED; color: var(--success); border: 1px solid #A8DBBF; }
+  .phase-banner.staff    { background: #E0F3F2; color: var(--teal);    border: 1px solid #A3D8D7; }
+  .phase-icon { font-size: 18px; }
+
+  /* ── SECTIONS ── */
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); margin-bottom: 1rem; overflow: hidden; }
+  .section-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--surface2); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+  .section-head:hover { background: var(--surface3); }
+  .section-num { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .section-num.purple { background: var(--purple); }
+  .section-num.green  { background: var(--success); }
+  .section-num.teal   { background: var(--teal); }
+  .section-title { font-size: 14px; font-weight: 500; color: var(--navy); flex: 1; }
+  .section-chevron { color: var(--hint); transition: transform .2s; font-size: 12px; }
+  .section-chevron.open { transform: rotate(180deg); }
+  .section-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .section-body.collapsed { display: none; }
+
+  /* ── FORMS ── */
+  label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; font-weight: 500; }
+  input[type=text], input[type=date], select, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--text); background: var(--surface); outline: none; transition: border-color .15s; }
+  input:focus, select:focus, textarea:focus { border-color: var(--blue-light); box-shadow: 0 0 0 3px rgba(37,99,196,.08); }
+  textarea { resize: vertical; min-height: 75px; }
+  .field-row { display: flex; gap: 10px; }
+  .field-row > * { flex: 1; min-width: 0; }
+
+  /* ── PILLS ── */
+  .pill-group { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill input { display: none; }
+  .pill label { cursor: pointer; font-size: 12px; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); color: var(--muted); background: var(--surface); transition: all .12s; display: inline-block; margin: 0; font-weight: 400; }
+  .pill input:checked + label { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .pill-blue   input:checked + label { background: var(--blue-light); border-color: var(--blue-light); }
+  .pill-purple input:checked + label { background: var(--purple);     border-color: var(--purple); }
+
+  /* ── SLIDER (layout de ta version originale) ── */
+  .slider-row { display: flex; align-items: center; gap: 12px; }
+  .slider-label { font-size: 12px; color: var(--muted); flex: 1; }
+  .slider-wrap { flex: 2; display: flex; align-items: center; gap: 8px; }
+  input[type=range] { flex: 1; -webkit-appearance: none; height: 4px; border-radius: 2px; background: var(--border); outline: none; border: none; padding: 0; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  input[type=range].purple-thumb::-webkit-slider-thumb { background: var(--purple); }
+  input[type=range].teal-thumb::-webkit-slider-thumb { background: var(--teal); }
+  .slider-val { font-size: 13px; font-weight: 600; color: var(--navy); min-width: 20px; text-align: center; font-family: 'DM Mono', monospace; }
+
+  /* ── SCORE BUTTONS ── */
+  .score-btns { display: flex; gap: 4px; }
+  .score-btn { width: 32px; height: 32px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; transition: all .1s; }
+  .score-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .score-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* ── RESULT TABLE ── */
+  .result-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .result-table th { text-align: left; font-size: 11px; font-weight: 600; color: var(--hint); text-transform: uppercase; letter-spacing: .05em; padding: 6px 8px; border-bottom: 1px solid var(--border); background: var(--surface2); }
+  .result-table td { padding: 6px 4px; vertical-align: middle; border-bottom: 1px solid var(--border); }
+  .result-table tr:last-child td { border-bottom: none; }
+  .result-table input[type=text] { padding: 5px 7px; font-size: 13px; }
+  .nage-toggle { display: flex; gap: 4px; }
+  .nage-btn { padding: 4px 8px; border-radius: 5px; font-size: 11px; font-weight: 500; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; transition: all .1s; }
+  .nage-btn.oui { background: #E6F6ED; color: var(--success); border-color: #A8DBBF; }
+  .nage-btn.non { background: #FFF0F0; color: var(--error);   border-color: #F5AEAD; }
+  .tour-badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+  .tour-serie  { background: var(--surface3); color: var(--muted); }
+  .tour-demi   { background: #FFF3E8; color: var(--accent); }
+  .tour-finale { background: #E6F6ED;  color: var(--success); }
+
+  /* ── NATION OBS ── */
+  .nation-obs-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+  .nation-obs-card .nation-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .add-obs-btn { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1.5px dashed var(--border); border-radius: 8px; background: none; color: var(--hint); font-size: 13px; cursor: pointer; width: 100%; transition: all .12s; font-family: 'DM Sans', sans-serif; }
+  .add-obs-btn:hover { border-color: var(--blue-light); color: var(--blue-light); background: #EBF3FF; }
+
+  /* ── MOT DU JOUR ── */
+  .mot-wrap textarea { border-left: 3px solid var(--accent); border-radius: 0 7px 7px 0; padding-left: 12px; font-style: italic; min-height: 60px; }
+
+  /* ── STAFF ITEM ROW ── */
+  .staff-item-row { padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .staff-item-row:last-child { border-bottom: none; }
+  .staff-item-label { font-size: 13px; font-weight: 500; color: var(--navy); margin-bottom: 8px; }
+  .staff-item-label small { font-weight: 400; color: var(--muted); font-size: 11px; margin-left: 6px; }
+  .staff-slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .staff-slider-min { font-size: 11px; color: var(--hint); min-width: 70px; }
+  .staff-slider-max { font-size: 11px; color: var(--hint); min-width: 70px; text-align: right; }
+
+  /* ── TOGGLE MÉDECIN ── */
+  .toggle-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+  .toggle-lbl { font-size: 13px; font-weight: 500; color: var(--navy); flex: 1; }
+  .toggle-switch { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; border-radius: 11px; background: var(--border); cursor: pointer; transition: .2s; }
+  .toggle-slider:before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; bottom: 3px; border-radius: 50%; background: #fff; transition: .2s; }
+  input:checked + .toggle-slider { background: var(--error); }
+  input:checked + .toggle-slider:before { transform: translateX(18px); }
+
+  /* ── CHECK ITEM ── */
+  .check-item { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 400; color: var(--navy); cursor: pointer; padding: 4px 0; margin: 0; }
+  .check-item input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--teal); flex-shrink: 0; cursor: pointer; }
+
+  /* ── STAR BUTTONS ── */
+  .star-btns { display: flex; gap: 2px; }
+  .star-btn { width: 28px; height: 28px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface); font-size: 16px; color: var(--hint); cursor: pointer; transition: all .1s; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .star-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .star-btn.active { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+  .star-btns-lg .star-btn { width: 36px; height: 36px; font-size: 20px; }
+
+  /* ── POSTCOMP GRID ── */
+  .postcomp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* ── SAVE BAR ── */
+  .save-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; margin-top: 1rem; position: sticky; bottom: 1rem; box-shadow: 0 4px 20px rgba(10,22,40,.12); }
+  .save-info { font-size: 12px; color: var(--muted); }
+
+  /* ── BUTTONS ── */
+  .btn { padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: all .12s; display: inline-flex; align-items: center; gap: 6px; font-family: 'DM Sans', sans-serif; }
+  .btn:hover { background: var(--surface2); }
+  .btn-primary { background: var(--blue-light); color: #fff; border-color: var(--blue-light); }
+  .btn-primary:hover { background: var(--blue); }
+  .btn-accent  { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-purple  { background: var(--purple); color: #fff; border-color: var(--purple); }
+  .btn-green   { background: var(--success); color: #fff; border-color: var(--success); }
+  .btn-teal    { background: var(--teal);   color: #fff; border-color: var(--teal); }
+  .btn-sm  { padding: 5px 10px; font-size: 12px; }
+  .btn-danger { color: var(--error); border-color: #fcc; }
+  .btn-danger:hover { background: #fff0f0; }
+
+  /* ── HORS PÉRIODE ── */
+  .hors-periode-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 2rem; text-align: center; color: var(--hint); }
+
+  /* ── TOAST ── */
+  .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--navy); color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 13px; opacity: 0; transition: all .25s; z-index: 999; white-space: nowrap; }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  .toast.error   { background: var(--error); }
+  .toast.success { background: var(--success); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-brand">
+    <div class="header-logo" id="header-logo">FFN</div>
+    <div class="header-title" id="header-title">Journal de bord</div>
+  </div>
+  <div class="header-right">
+    <span class="role-badge" id="role-badge">STAFF</span>
+    <span class="coach-name" id="header-coach-name"></span>
+    <span class="save-status" id="save-status">Non sauvegardé</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     ÉCRAN DE SÉLECTION
+════════════════════════════════════ -->
+<div class="setup-screen" id="setup-screen">
+  <div class="setup-card">
+    <div class="setup-logo">
+      <svg width="24" height="24" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M3 21a9 9 0 0118 0"/></svg>
+    </div>
+    <div class="setup-title">Journal de bord</div>
+    <div class="setup-sub">Sélectionnez votre compétition et votre profil pour commencer.</div>
+
+    <div style="margin-bottom:12px">
+      <label>Compétition</label>
+      <select id="setup-comp" onchange="onSetupCompChange()"><option value="">— Choisir —</option></select>
+    </div>
+    <div style="margin-bottom:8px">
+      <label>Votre profil</label>
+      <select id="setup-coach" disabled onchange="onCoachChange()"><option value="">— D'abord choisir une compétition —</option></select>
+    </div>
+    <div class="role-indicator" id="role-indicator"></div>
+
+    <div style="margin-top:1.5rem">
+      <button class="btn btn-primary" id="start-btn" style="width:100%;justify-content:center" onclick="startJournal()">Ouvrir le journal →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     JOURNAL PRINCIPAL
+════════════════════════════════════ -->
+<div class="journal-wrap" id="journal-wrap">
+
+  <!-- BARRE DE DATE -->
+  <div class="day-bar">
+    <label>Date :</label>
+    <input type="date" id="jour-date" onchange="onDateChange()">
+    <div class="day-badge badge-comp" id="jour-label">Jour 1</div>
+  </div>
+
+  <!-- BANDEAUX DE PHASE -->
+  <div id="phase-banners"></div>
+
+  <!-- ════════ ZONE PRÉ-COMPÉTITION ════════ -->
+  <div id="zone-precomp" style="display:none">
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num purple">A</div>
+        <div class="section-title">Préparation physique — charges d'entraînement</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div>
+          <label>Charge d'entraînement du jour</label>
+          <div class="slider-row">
+            <div class="slider-label">Légère</div>
+            <div class="slider-wrap"><input type="range" class="purple-thumb" id="pre-phys-charge" min="1" max="5" value="3" oninput="updateSlider(this,'pre-phys-charge-val')"></div>
+            <div class="slider-val" id="pre-phys-charge-val">3</div>
+            <div class="slider-label" style="text-align:right">Très lourde</div>
+          </div>
+          <textarea id="pre-phys-charge-obs" placeholder="Contenu de séance, remarques sur les charges…" style="margin-top:6px"></textarea>
+        </div>
+        <div>
+          <label>Niveau de fatigue des nageurs</label>
+          <div class="slider-row">
+            <div class="slider-label">Frais</div>
+            <div class="slider-wrap"><input type="range" class="purple-thumb" id="pre-phys-fatigue" min="1" max="5" value="2" oninput="updateSlider(this,'pre-phys-fatigue-val')"></div>
+            <div class="slider-val" id="pre-phys-fatigue-val">2</div>
+            <div class="slider-label" style="text-align:right">Épuisés</div>
+          </div>
+          <textarea id="pre-phys-fatigue-obs" placeholder="Signes de fatigue observés, récupération…" style="margin-top:6px"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num purple">B</div>
+        <div class="section-title">Préparation mentale</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div>
+          <label>Motivation</label>
+          <div class="slider-row">
+            <div class="slider-label">Faible</div>
+            <div class="slider-wrap"><input type="range" class="purple-thumb" id="pre-mental-motivation" min="1" max="5" value="3" oninput="updateSlider(this,'pre-mental-motivation-val')"></div>
+            <div class="slider-val" id="pre-mental-motivation-val">3</div>
+            <div class="slider-label" style="text-align:right">Très haute</div>
+          </div>
+          <textarea id="pre-mental-motivation-obs" placeholder="Observations…" style="margin-top:6px"></textarea>
+        </div>
+        <div>
+          <label>Confiance</label>
+          <div class="slider-row">
+            <div class="slider-label">Doutes</div>
+            <div class="slider-wrap"><input type="range" class="purple-thumb" id="pre-mental-confiance" min="1" max="5" value="3" oninput="updateSlider(this,'pre-mental-confiance-val')"></div>
+            <div class="slider-val" id="pre-mental-confiance-val">3</div>
+            <div class="slider-label" style="text-align:right">Très confiants</div>
+          </div>
+          <textarea id="pre-mental-confiance-obs" placeholder="Observations…" style="margin-top:6px"></textarea>
+        </div>
+        <div>
+          <label>Niveau d'anxiété <span style="font-weight:400;color:var(--hint);font-size:11px">(1 = très serein · 5 = très anxieux)</span></label>
+          <div class="slider-row">
+            <div class="slider-label">Sereins</div>
+            <div class="slider-wrap"><input type="range" class="purple-thumb" id="pre-mental-anxiete" min="1" max="5" value="2" oninput="updateSlider(this,'pre-mental-anxiete-val')"></div>
+            <div class="slider-val" id="pre-mental-anxiete-val">2</div>
+            <div class="slider-label" style="text-align:right">Très anxieux</div>
+          </div>
+          <textarea id="pre-mental-anxiete-obs" placeholder="Signes d'anxiété, actions de régulation…" style="margin-top:6px"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num purple">C</div>
+        <div class="section-title">État de forme des nageurs</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div>
+          <label>État de forme général</label>
+          <div class="slider-row">
+            <div class="slider-label">Mauvais</div>
+            <div class="slider-wrap"><input type="range" class="purple-thumb" id="pre-forme-generale" min="1" max="5" value="3" oninput="updateSlider(this,'pre-forme-generale-val')"></div>
+            <div class="slider-val" id="pre-forme-generale-val">3</div>
+            <div class="slider-label" style="text-align:right">Excellent</div>
+          </div>
+        </div>
+        <div><label>Sensations à l'entraînement</label><textarea id="pre-forme-sensations" placeholder="Sensations dans l'eau, qualité technique, timing…"></textarea></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num purple">D</div>
+        <div class="section-title">Relation entraîneur ↔ nageurs</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div>
+          <label>Qualité de la relation</label>
+          <div class="slider-row">
+            <div class="slider-label">Tendue</div>
+            <div class="slider-wrap"><input type="range" class="purple-thumb" id="pre-relation-qualite" min="1" max="5" value="3" oninput="updateSlider(this,'pre-relation-qualite-val')"></div>
+            <div class="slider-val" id="pre-relation-qualite-val">3</div>
+            <div class="slider-label" style="text-align:right">Excellente</div>
+          </div>
+          <textarea id="pre-relation-qualite-obs" placeholder="Observations…" style="margin-top:6px"></textarea>
+        </div>
+        <div><label>Incidents ou tensions à signaler</label><textarea id="pre-relation-incidents" placeholder="Décrire si nécessaire…"></textarea></div>
+        <div><label>Points d'attention / questions avant la compétition</label><textarea id="pre-points-attention" placeholder="Ce qui m'inquiète, ce que je veux surveiller…"></textarea></div>
+        <div><label>Rappel des objectifs fixés</label><textarea id="pre-objectifs-rappel" placeholder="Objectifs de performance, de comportement, de processus…"></textarea></div>
+        <div><label>Scénarios imprévus anticipés</label><textarea id="pre-scenarios" placeholder="Quels imprévus pourraient survenir ? Comment vais-je y répondre ?"></textarea></div>
+        <div><label>Mes plans de contingence (A/B/C)</label><textarea id="pre-plans-contingence" placeholder="Si X se produit, alors je ferai Y…"></textarea></div>
+      </div>
+    </div>
+
+  </div><!-- /zone-precomp -->
+
+  <!-- ════════ ZONE PRÉ-COMPÉTITION — STAFF ════════ -->
+  <div id="zone-precomp-staff" style="display:none">
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num teal">A</div>
+        <div class="section-title">État du groupe</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div>
+          <label>Forme générale du groupe</label>
+          <div class="staff-slider-row">
+            <span class="staff-slider-min">Mauvaise</span>
+            <div class="slider-wrap"><input type="range" class="teal-thumb" id="groupe-forme-generale" min="1" max="5" value="3" oninput="updateStaffSlider(this,'groupe-forme-generale-val','var(--teal)')"></div>
+            <span class="slider-val" id="groupe-forme-generale-val">3</span>
+            <span class="staff-slider-max">Excellente</span>
+          </div>
+          <textarea id="groupe-forme-obs" placeholder="Observations…" style="margin-top:6px;min-height:55px"></textarea>
+        </div>
+        <div>
+          <label>Motivation</label>
+          <div class="staff-slider-row">
+            <span class="staff-slider-min">Faible</span>
+            <div class="slider-wrap"><input type="range" class="teal-thumb" id="groupe-motivation" min="1" max="5" value="3" oninput="updateStaffSlider(this,'groupe-motivation-val','var(--teal)')"></div>
+            <span class="slider-val" id="groupe-motivation-val">3</span>
+            <span class="staff-slider-max">Très haute</span>
+          </div>
+          <textarea id="groupe-motivation-obs" placeholder="Observations…" style="margin-top:6px;min-height:55px"></textarea>
+        </div>
+        <div>
+          <label>Cohésion</label>
+          <div class="staff-slider-row">
+            <span class="staff-slider-min">Faible</span>
+            <div class="slider-wrap"><input type="range" class="teal-thumb" id="groupe-cohesion" min="1" max="5" value="3" oninput="updateStaffSlider(this,'groupe-cohesion-val','var(--teal)')"></div>
+            <span class="slider-val" id="groupe-cohesion-val">3</span>
+            <span class="staff-slider-max">Très forte</span>
+          </div>
+          <textarea id="groupe-cohesion-obs" placeholder="Observations…" style="margin-top:6px;min-height:55px"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num teal">B</div>
+        <div class="section-title">Matériel et équipements</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <table class="result-table">
+          <thead><tr><th>Élément</th><th style="width:160px">Statut</th><th>Observations</th></tr></thead>
+          <tbody>
+            <tr><td>Tenues EDF</td><td><select id="mat-tenues" style="font-size:12px"><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="mat-tenues-obs" placeholder="Observations…"></td></tr>
+            <tr><td>Équipement compétition</td><td><select id="mat-equipement-comp" style="font-size:12px"><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="mat-equipement-comp-obs" placeholder="Observations…"></td></tr>
+            <tr><td>Équipement suivi et analyse</td><td><select id="mat-equipement-analyse" style="font-size:12px"><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="mat-equipement-analyse-obs" placeholder="Observations…"></td></tr>
+            <tr><td>Matériel médical et kiné</td><td><select id="mat-medical" style="font-size:12px"><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="mat-medical-obs" placeholder="Observations…"></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num teal">C</div>
+        <div class="section-title">Planification et objectifs</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div><label>Objectifs fixés pour ce stage / cette compétition</label><textarea id="ps-objectifs-groupe" placeholder="Objectifs collectifs et individuels…"></textarea></div>
+        <div><label>Scénarios imprévus anticipés</label><textarea id="ps-scenarios-anticipes" placeholder="Quels imprévus pourraient survenir ? Comment vais-je y répondre ?"></textarea></div>
+        <div><label>Plans de contingence A/B/C</label><textarea id="ps-plans-contingence" placeholder="Si X se produit, alors je ferai Y…"></textarea></div>
+        <div><label>Composition et rôles du staff</label><textarea id="ps-composition-staff" placeholder="Qui fait quoi…"></textarea></div>
+        <div><label>Rôles et responsabilités</label><textarea id="ps-roles-responsabilites" placeholder="Répartition des responsabilités…"></textarea></div>
+        <div><label>Points d'attention particuliers</label><textarea id="ps-points-attention-staff" placeholder="Ce qui mérite une attention particulière…"></textarea></div>
+        <div><label>Observations générales</label><textarea id="ps-observations-generales" placeholder="Tout autre observation…"></textarea></div>
+      </div>
+    </div>
+
+  </div><!-- /zone-precomp-staff -->
+
+  <!-- ════════ ZONE COMPÉTITION — ENTRAÎNEUR ════════ -->
+  <div id="zone-comp" style="display:none">
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num">1</div>
+        <div class="section-title">Contexte du jour</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div>
+          <label>État général du groupe</label>
+          <div class="pill-group" id="etat-groupe">
+            <div class="pill"><input type="radio" name="etat" id="e1" value="Très bien"><label for="e1">Très bien</label></div>
+            <div class="pill"><input type="radio" name="etat" id="e2" value="Bien"><label for="e2">Bien</label></div>
+            <div class="pill"><input type="radio" name="etat" id="e3" value="Moyen"><label for="e3">Moyen</label></div>
+            <div class="pill"><input type="radio" name="etat" id="e4" value="Fatigué"><label for="e4">Fatigué</label></div>
+            <div class="pill"><input type="radio" name="etat" id="e5" value="Tendu"><label for="e5">Tendu</label></div>
+          </div>
+        </div>
+        <div>
+          <label>Observations générales — ambiance, organisation, incidents</label>
+          <textarea id="obs-contexte" placeholder="Compétition, public, météo, logistique, ce qui a marqué la journée…"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num">2</div>
+        <div class="section-title">Mes nageurs — performances du jour</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <table class="result-table">
+          <thead><tr><th style="width:20%">Nageur·se</th><th style="width:22%">Épreuve</th><th style="width:12%">Tour</th><th style="width:15%">A nagé ?</th><th style="width:12%">Temps</th><th style="width:7%">Rang</th><th>Observations</th></tr></thead>
+          <tbody id="results-tbody"></tbody>
+        </table>
+        <div style="font-size:12px;color:var(--hint)">Le programme est pré-rempli depuis les épreuves du jour.</div>
+        <div>
+          <label>Gestion des émotions et du stress</label>
+          <textarea id="gestion-emotions" placeholder="Comment ai-je accompagné mes nageurs avant et après course ? Qu'est-ce qui a bien fonctionné ?"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num">3</div>
+        <div class="section-title">Mon état de forme aujourd'hui</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div>
+          <label>Forme physique</label>
+          <div class="slider-row">
+            <div class="slider-label">Épuisé</div>
+            <div class="slider-wrap"><input type="range" id="forme-physique" min="1" max="5" value="3" oninput="updateSlider(this,'val-physique')"></div>
+            <div class="slider-val" id="val-physique">3</div>
+            <div class="slider-label" style="text-align:right">En pleine forme</div>
+          </div>
+        </div>
+        <div>
+          <label>Forme psychologique</label>
+          <div class="slider-row">
+            <div class="slider-label">Très bas</div>
+            <div class="slider-wrap"><input type="range" id="forme-psychologique" min="1" max="5" value="3" oninput="updateSlider(this,'val-psycho')"></div>
+            <div class="slider-val" id="val-psycho">3</div>
+            <div class="slider-label" style="text-align:right">Excellent</div>
+          </div>
+        </div>
+        <div>
+          <label>Observations sur ma forme ou mon vécu du jour</label>
+          <textarea id="obs-forme" placeholder="Fatigue accumulée, tension, satisfaction, ce que j'ai ressenti…"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num">4</div>
+        <div class="section-title">Ma posture d'entraîneur</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div style="font-size:12px;color:var(--muted)">Auto-évaluation de 1 à 5</div>
+        <div style="display:flex;flex-direction:column;gap:15px">
+          <div>
+            <label style="display:block;margin-bottom:5px;font-size:14px;font-weight:500">Communication avec mes nageurs</label>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:12px;color:var(--muted)">Faible</span>
+              <input type="range" id="eval-commu" class="purple-thumb" min="1" max="5" value="3" oninput="updateSlider(this,'eval-commu-val')">
+              <span class="slider-val" id="eval-commu-val">3</span>
+              <span style="font-size:12px;color:var(--muted)">Excellente</span>
+            </div>
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:5px;font-size:14px;font-weight:500">Gestion de mon stress et émotions</label>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:12px;color:var(--muted)">Difficile</span>
+              <input type="range" id="eval-stress" class="purple-thumb" min="1" max="5" value="3" oninput="updateSlider(this,'eval-stress-val')">
+              <span class="slider-val" id="eval-stress-val">3</span>
+              <span style="font-size:12px;color:var(--muted)">Très bien</span>
+            </div>
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:5px;font-size:14px;font-weight:500">Concentration sur l'essentiel malgré les distractions</label>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:12px;color:var(--muted)">Difficile</span>
+              <input type="range" id="eval-concentration" class="purple-thumb" min="1" max="5" value="3" oninput="updateSlider(this,'eval-concentration-val')">
+              <span class="slider-val" id="eval-concentration-val">3</span>
+              <span style="font-size:12px;color:var(--muted)">Excellente</span>
+            </div>
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:5px;font-size:14px;font-weight:500">Expression intentionnelle de mes émotions</label>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:12px;color:var(--muted)">Absente</span>
+              <input type="range" id="eval-expression" class="purple-thumb" min="1" max="5" value="3" oninput="updateSlider(this,'eval-expression-val')">
+              <span class="slider-val" id="eval-expression-val">3</span>
+              <span style="font-size:12px;color:var(--muted)">Très présente</span>
+            </div>
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:5px;font-size:14px;font-weight:500">Pertinence de mes décisions tactiques</label>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:12px;color:var(--muted)">Inadéquates</span>
+              <input type="range" id="eval-decisions" class="purple-thumb" min="1" max="5" value="3" oninput="updateSlider(this,'eval-decisions-val')">
+              <span class="slider-val" id="eval-decisions-val">3</span>
+              <span style="font-size:12px;color:var(--muted)">Excellentes</span>
+            </div>
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:5px;font-size:14px;font-weight:500">Présence et disponibilité</label>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:12px;color:var(--muted)">Absente</span>
+              <input type="range" id="eval-presence" class="purple-thumb" min="1" max="5" value="3" oninput="updateSlider(this,'eval-presence-val')">
+              <span class="slider-val" id="eval-presence-val">3</span>
+              <span style="font-size:12px;color:var(--muted)">Totale</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label>Ce que j'aurais fait différemment</label>
+          <textarea id="ce-quaurais-fait" placeholder="Une décision, une parole, un timing — avec le recul du soir…"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num">5</div>
+        <div class="section-title">Apprentissages et questions du jour</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div>
+          <label>Ce que j'ai appris aujourd'hui — être précis et concret</label>
+          <textarea id="apprentissages" placeholder="Une observation technique, tactique, managériale ou autre. Pas de généralités."></textarea>
+        </div>
+        <div>
+          <label>Questions soulevées / pistes à explorer</label>
+          <textarea id="questions-jour" placeholder="Que vais-je chercher à vérifier à mon retour à l'entraînement ?"></textarea>
+        </div>
+        <div>
+          <label>Thèmes concernés</label>
+          <div class="pill-group" id="themes-group">
+            <div class="pill pill-blue"><input type="checkbox" id="th1" value="Biomécanique"><label for="th1">Biomécanique</label></div>
+            <div class="pill pill-blue"><input type="checkbox" id="th2" value="Physiologie"><label for="th2">Physiologie</label></div>
+            <div class="pill pill-blue"><input type="checkbox" id="th3" value="Préparation mentale"><label for="th3">Préparation mentale</label></div>
+            <div class="pill pill-blue"><input type="checkbox" id="th4" value="Management"><label for="th4">Management</label></div>
+            <div class="pill pill-blue"><input type="checkbox" id="th5" value="Organisation"><label for="th5">Organisation</label></div>
+            <div class="pill pill-blue"><input type="checkbox" id="th6" value="Technologie / data"><label for="th6">Technologie / data</label></div>
+            <div class="pill pill-blue"><input type="checkbox" id="th7" value="Récupération"><label for="th7">Récupération</label></div>
+            <div class="pill pill-blue"><input type="checkbox" id="th8" value="Autre"><label for="th8">Autre</label></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num">6</div>
+        <div class="section-title">Observations sur les autres nations</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div id="nations-obs-list"></div>
+        <button class="add-obs-btn" onclick="addNationObs()">+ Ajouter une observation</button>
+      </div>
+    </div>
+
+    <div class="section" style="border-left:3px solid var(--teal)">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num teal">✦</div>
+        <div class="section-title">Nageurs à l'entraînement</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
+          Nageurs associés non engagés dans les épreuves de cette séance.
+          Matin = séries · Après-midi = demi-finales / finales
+        </p>
+        <div id="noncomp-list">
+          <div class="empty" style="padding:8px;font-size:12px">Chargement…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <div class="section-num" style="background:var(--accent2)">✦</div>
+        <div class="section-title">Le mot du jour</div>
+      </div>
+      <div class="section-body">
+        <div style="font-size:12px;color:var(--muted)">En une phrase, ce que cette journée m'a appris ou confirmé</div>
+        <div class="mot-wrap">
+          <textarea id="mot-du-jour" placeholder="Cette journée m'a confirmé que…"></textarea>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /zone-comp -->
+
+  <!-- ════════ ZONE COMPÉTITION — STAFF ════════ -->
+  <div id="zone-staff" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding:0 1rem;background:var(--surface2);border-radius:8px;padding:1rem">
+      <div style="font-weight:600;color:var(--navy)">Bilan Staff</div>
+      <button class="btn btn-sm" onclick="generateStaffPDF()" style="background:var(--blue-light);color:#fff">↓ Exporter PDF</button>
+    </div>
+
+    <!-- ASPECTS LOGISTIQUES -->
+    <div class="section" style="border-left:3px solid var(--blue-light)">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num teal">1</div>
+        <div class="section-title">Aspects logistiques</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body" id="staff-logistique-body"></div>
+    </div>
+
+    <!-- VIE DE GROUPE -->
+    <div class="section" style="border-left:3px solid var(--teal)">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num teal">3</div>
+        <div class="section-title">Vie de groupe</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body" id="staff-vie-body">
+        <!-- Les items slider sont injectés par JS, le toggle médecin est fixe -->
+        <div class="toggle-row" style="padding:12px 0;border-top:1px solid var(--border);margin-top:4px">
+          <span class="toggle-lbl">Intervention médecin aujourd'hui ?</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="vie-medecin" onchange="document.getElementById('medecin-obs-wrap').style.display=this.checked?'':'none'">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div id="medecin-obs-wrap" style="display:none">
+          <label>Précisions</label>
+          <textarea id="vie-medecin-obs" placeholder="Nature de l'intervention, nageur(s) concerné(s)…"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- BRIEFINGS -->
+    <div class="section" style="border-left:3px solid var(--accent)">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num teal">✦</div>
+        <div class="section-title">Briefings du jour</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div class="toggle-row">
+          <span class="toggle-lbl">Briefing staff effectué</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="staff-briefing-staff">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-lbl">Briefing nageurs effectué</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="staff-briefing-nageurs">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- OBSERVATIONS GÉNÉRALES -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-num teal">✦</div>
+        <div class="section-title">Observations générales du jour</div>
+      </div>
+      <div class="section-body">
+        <textarea id="staff-obs-generales" placeholder="Tout ce qui mérite d'être noté et qui ne rentre pas dans les catégories ci-dessus…" style="min-height:90px"></textarea>
+      </div>
+    </div>
+
+    <!-- Hidden PDF Template -->
+    <div id="staff-pdf-container" style="display:none;background:#fff;padding:40px;font-family:'DM Sans',sans-serif;color:#333;max-width:800px">
+      <div style="text-align:center;margin-bottom:30px;border-bottom:2px solid #0A1628;padding-bottom:20px">
+        <h1 style="margin:0;font-size:24px;color:#0A1628">Bilan Staff</h1>
+        <p style="margin:5px 0;font-size:12px;color:#666">Compétition FFN — Journal de bord</p>
+        <p style="margin:5px 0;font-size:12px;color:#666" id="pdf-date"></p>
+      </div>
+
+      <div id="pdf-content-logistique" style="margin-bottom:25px">
+        <h2 style="font-size:14px;color:#0A1628;border-bottom:1px solid #ddd;padding-bottom:8px;margin-bottom:12px">Aspects Logistiques</h2>
+        <div id="pdf-logistique-items"></div>
+      </div>
+
+      <div id="pdf-content-vie" style="margin-bottom:25px">
+        <h2 style="font-size:14px;color:#0A1628;border-bottom:1px solid #ddd;padding-bottom:8px;margin-bottom:12px">Vie de Groupe</h2>
+        <div id="pdf-vie-items"></div>
+      </div>
+
+      <div id="pdf-content-posture" style="margin-bottom:25px">
+        <h2 style="font-size:14px;color:#0A1628;border-bottom:1px solid #ddd;padding-bottom:8px;margin-bottom:12px">Posture d'Entraîneur (Comp)</h2>
+        <div id="pdf-posture-items"></div>
+      </div>
+
+      <div style="margin-bottom:25px">
+        <h2 style="font-size:14px;color:#0A1628;border-bottom:1px solid #ddd;padding-bottom:8px;margin-bottom:12px">Observations Générales</h2>
+        <p style="margin:0;line-height:1.6;font-size:11px;white-space:pre-wrap" id="pdf-obs-generales"></p>
+      </div>
+    </div>
+
+  </div><!-- /zone-staff -->
+
+  <!-- ════════ ZONE POST-COMPÉTITION ════════ -->
+  <div id="zone-postcomp" style="display:none">
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num green">I</div>
+        <div class="section-title">Bilan des performances</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div><label>Ce qui était prévu vs ce qui a été réalisé</label><textarea id="post-bilan-perf" placeholder="Objectifs atteints, dépassés, manqués…"></textarea></div>
+        <div class="postcomp-grid">
+          <div><label>Surprises positives</label><textarea id="post-surprises-pos" placeholder="Ce qui m'a agréablement surpris…"></textarea></div>
+          <div><label>Surprises négatives</label><textarea id="post-surprises-neg" placeholder="Ce que je n'avais pas anticipé…"></textarea></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num green">II</div>
+        <div class="section-title">3 apprentissages clés de la compétition</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div><label>Apprentissage 1 — le plus important</label><textarea id="post-app1" placeholder="Soyez précis et concret…"></textarea></div>
+        <div><label>Apprentissage 2</label><textarea id="post-app2"></textarea></div>
+        <div><label>Apprentissage 3</label><textarea id="post-app3"></textarea></div>
+        <div><label>Ce que je vais modifier à mon retour à l'entraînement</label><textarea id="post-modif" placeholder="Actions concrètes…"></textarea></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num green">III</div>
+        <div class="section-title">Nations et pratiques étrangères</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div><label>Pratiques étrangères à retenir / tester</label><textarea id="post-nations" placeholder="Méthodes d'entraînement, préparation, logistique, innovations observées…"></textarea></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num green">IV</div>
+        <div class="section-title">Mon vécu d'entraîneur</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div style="font-size:12px;color:var(--muted)">Auto-évaluation globale de la compétition</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Qualité de mon accompagnement</label><div class="score-btns" id="post-scores-accomp"></div></div>
+          <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Gestion globale du stress</label><div class="score-btns" id="post-scores-stress"></div></div>
+          <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Qualité de la communication</label><div class="score-btns" id="post-scores-commu"></div></div>
+          <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Richesse des apprentissages</label><div class="score-btns" id="post-scores-app"></div></div>
+        </div>
+        <div><label>Ce qui m'a le plus marqué</label><textarea id="post-vecu" placeholder="Un moment, une émotion, une rencontre…"></textarea></div>
+        <div><label>Message à mes collègues</label><textarea id="post-message" placeholder="Ce que j'aimerais partager avec l'équipe…"></textarea></div>
+      </div>
+    </div>
+
+  </div><!-- /zone-postcomp -->
+
+  <!-- ════════ ZONE POST-COMPÉTITION — STAFF ════════ -->
+  <div id="zone-postcomp-staff" style="display:none">
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num green">I</div>
+        <div class="section-title">Bilan déplacement</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Voyage</div>
+        <div class="field-row">
+          <div><label>Date/heure départ</label><input type="text" id="dep-date-depart" placeholder="ex : 15/07 08h30"></div>
+          <div><label>Date/heure retour</label><input type="text" id="dep-date-retour" placeholder="ex : 20/07 21h15"></div>
+        </div>
+        <div><label>Compagnie(s) et numéros de vol</label><input type="text" id="dep-compagnie" placeholder="ex : Air France AF1234"></div>
+        <div><label>Incidents voyage</label><textarea id="dep-incidents" placeholder="Retards, problèmes bagages…"></textarea></div>
+        <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Qualité globale du voyage</label><div class="star-btns" id="pcs-dep-qualite-voyage"></div></div>
+
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-top:12px;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Hébergement</div>
+        <div><label>Nom de l'établissement</label><input type="text" id="heb-nom" placeholder="Nom de l'hôtel…"></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Qualité hébergement</label><div class="star-btns" id="pcs-heb-qualite"></div></div>
+          <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Adéquation sportive</label><div class="star-btns" id="pcs-heb-adequation"></div></div>
+          <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Proximité site</label><div class="star-btns" id="pcs-heb-proximite"></div></div>
+        </div>
+        <div><label>Observations hébergement</label><textarea id="heb-observations" placeholder="Qualité des chambres, services, points à améliorer…"></textarea></div>
+
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-top:12px;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Restauration et transport</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Qualité nutritionnelle des repas</label><div class="star-btns" id="pcs-resto-qualite"></div></div>
+          <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Quantité de nourriture</label><div class="star-btns" id="pcs-resto-quantite"></div></div>
+          <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Transport local hôtel → site</label><div class="star-btns" id="pcs-transport-local"></div></div>
+        </div>
+        <div><label>Commentaires restauration / transport</label><textarea id="resto-commentaires" placeholder="Observations…"></textarea></div>
+
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-top:12px;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Site de compétition</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Qualité du site</label><div class="star-btns" id="pcs-site-qualite"></div></div>
+          <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Qualité d'accueil et d'organisation</label><div class="star-btns" id="pcs-site-accueil"></div></div>
+        </div>
+        <div><label>Commentaires site</label><textarea id="site-commentaires" placeholder="Qualité des bassins, installations, accueil…"></textarea></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num green">II</div>
+        <div class="section-title">Bilan encadrement</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div style="font-size:12px;color:var(--muted)">Auto-évaluation de 1 à 5 étoiles</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Qualité communication staff ↔ nageurs</label><div class="star-btns" id="pcs-enc-communication"></div></div>
+          <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Cohésion interne du staff</label><div class="star-btns" id="pcs-enc-cohesion"></div></div>
+          <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Relation avec l'organisation de la compétition</label><div class="star-btns" id="pcs-enc-relation-orga"></div></div>
+          <div class="field-row" style="align-items:center"><label style="margin:0;flex:2">Gestion des situations imprévues</label><div class="star-btns" id="pcs-enc-gestion-imprevus"></div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;margin-top:8px">
+          <label class="check-item"><input type="checkbox" id="enc-reunion-equipe"> Réunion d'équipe tenue avant la compétition</label>
+          <label class="check-item"><input type="checkbox" id="enc-briefing-staff"> Briefing staff</label>
+          <label class="check-item"><input type="checkbox" id="enc-briefing-nageurs"> Briefing nageurs</label>
+          <label class="check-item"><input type="checkbox" id="enc-protocoles-medicaux"> Protocoles médicaux respectés</label>
+          <label class="check-item"><input type="checkbox" id="enc-retour-experience"> Debriefing compétition équipe</label>
+        </div>
+        <div><label>Incidents ou signalements</label><textarea id="enc-incidents" placeholder="Incidents survenus, signalements à faire remonter…"></textarea></div>
+        <div><label>Observations générales sur l'encadrement</label><textarea id="enc-observations" placeholder="Bilan global de l'encadrement…"></textarea></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num green">III</div>
+        <div class="section-title">Bilan logistique</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <table class="result-table">
+          <thead><tr><th>Élément</th><th style="width:160px">Statut</th><th>Observations</th></tr></thead>
+          <tbody>
+            <tr><td>Tenues EDF</td><td><select id="pcs-mat-tenues" style="font-size:12px"><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="pcs-mat-tenues-obs" placeholder="Observations…"></td></tr>
+            <tr><td>Équipement technique compétition</td><td><select id="pcs-mat-equipement-comp" style="font-size:12px"><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="pcs-mat-equipement-comp-obs" placeholder="Observations…"></td></tr>
+            <tr><td>Équipement analyse</td><td><select id="pcs-mat-equipement-analyse" style="font-size:12px"><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="pcs-mat-equipement-analyse-obs" placeholder="Observations…"></td></tr>
+            <tr><td>Matériel médical</td><td><select id="pcs-mat-medical" style="font-size:12px"><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="pcs-mat-medical-obs" placeholder="Observations…"></td></tr>
+          </tbody>
+        </table>
+        <div><label>Problèmes administratifs rencontrés</label><textarea id="pcs-problemes-admin" placeholder="Difficultés administratives, points à améliorer…"></textarea></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num green">IV</div>
+        <div class="section-title">Bilan synthétique</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <table class="result-table">
+          <thead><tr><th>Domaine</th><th style="text-align:center">Très positif</th><th style="text-align:center">Positif</th><th style="text-align:center">Mitigé</th><th style="text-align:center">Décevant</th></tr></thead>
+          <tbody>
+            <tr><td>Sportif</td><td style="text-align:center"><input type="radio" name="bilan-sportif" value="Très positif"></td><td style="text-align:center"><input type="radio" name="bilan-sportif" value="Positif"></td><td style="text-align:center"><input type="radio" name="bilan-sportif" value="Mitigé"></td><td style="text-align:center"><input type="radio" name="bilan-sportif" value="Décevant"></td></tr>
+            <tr><td>Encadrement</td><td style="text-align:center"><input type="radio" name="bilan-encadrement" value="Très positif"></td><td style="text-align:center"><input type="radio" name="bilan-encadrement" value="Positif"></td><td style="text-align:center"><input type="radio" name="bilan-encadrement" value="Mitigé"></td><td style="text-align:center"><input type="radio" name="bilan-encadrement" value="Décevant"></td></tr>
+            <tr><td>Logistique</td><td style="text-align:center"><input type="radio" name="bilan-logistique" value="Très positif"></td><td style="text-align:center"><input type="radio" name="bilan-logistique" value="Positif"></td><td style="text-align:center"><input type="radio" name="bilan-logistique" value="Mitigé"></td><td style="text-align:center"><input type="radio" name="bilan-logistique" value="Décevant"></td></tr>
+            <tr><td>Déplacement</td><td style="text-align:center"><input type="radio" name="bilan-deplacement" value="Très positif"></td><td style="text-align:center"><input type="radio" name="bilan-deplacement" value="Positif"></td><td style="text-align:center"><input type="radio" name="bilan-deplacement" value="Mitigé"></td><td style="text-align:center"><input type="radio" name="bilan-deplacement" value="Décevant"></td></tr>
+            <tr><td>Organisation</td><td style="text-align:center"><input type="radio" name="bilan-organisation" value="Très positif"></td><td style="text-align:center"><input type="radio" name="bilan-organisation" value="Positif"></td><td style="text-align:center"><input type="radio" name="bilan-organisation" value="Mitigé"></td><td style="text-align:center"><input type="radio" name="bilan-organisation" value="Décevant"></td></tr>
+          </tbody>
+        </table>
+        <div class="field-row" style="align-items:center;margin-top:10px"><label style="margin:0;flex:2;font-size:14px;font-weight:600;color:var(--navy)">Note globale</label><div class="star-btns star-btns-lg" id="pcs-note-globale"></div></div>
+        <div><label>Points forts — ce qui a bien fonctionné (à reconduire)</label><textarea id="pcs-points-forts" placeholder="Ce qui a bien marché, à répéter…"></textarea></div>
+        <div><label>Points à améliorer — axes de progrès</label><textarea id="pcs-points-ameliorer" placeholder="Ce qui doit évoluer, mesures correctives…"></textarea></div>
+        <div><label>Recommandations sportives</label><textarea id="pcs-recommandations-sport" placeholder="Nageurs à suivre, orientations sélection…"></textarea></div>
+        <div><label>Recommandations organisationnelles</label><textarea id="pcs-recommandations-orga" placeholder="Logistique, prestataires, hébergement…"></textarea></div>
+        <div><label>Conclusions et propositions à transmettre au DTN</label><textarea id="pcs-conclusions-dtn" placeholder="Messages clés pour le DTN…"></textarea></div>
+      </div>
+    </div>
+
+  </div><!-- /zone-postcomp-staff -->
+
+  <!-- ════════ ZONE VOYAGE ════════ -->
+  <div id="zone-voyage" style="display:none">
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num teal">1</div>
+        <div class="section-title">Type de journée</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div>
+          <label>Aller ou retour ?</label>
+          <div class="pill-group">
+            <div class="pill"><input type="radio" name="voyage-type" id="vt-aller" value="aller"><label for="vt-aller">✈️ Aller</label></div>
+            <div class="pill"><input type="radio" name="voyage-type" id="vt-retour" value="retour"><label for="vt-retour">🏠 Retour</label></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Forme personnelle — visible par tous -->
+    <div class="section" id="voyage-forme-section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num teal">2</div>
+        <div class="section-title">Forme personnelle</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div>
+          <label>Forme physique</label>
+          <div class="slider-row">
+            <div class="slider-label">Épuisé</div>
+            <div class="slider-wrap"><input type="range" class="teal-thumb" id="voy-forme-physique" min="1" max="5" value="3" oninput="updateSlider(this,'voy-forme-physique-val')"></div>
+            <div class="slider-val" id="voy-forme-physique-val">3</div>
+            <div class="slider-label" style="text-align:right">En pleine forme</div>
+          </div>
+        </div>
+        <div>
+          <label>Forme psychologique</label>
+          <div class="slider-row">
+            <div class="slider-label">Très bas</div>
+            <div class="slider-wrap"><input type="range" class="teal-thumb" id="voy-forme-psychologique" min="1" max="5" value="3" oninput="updateSlider(this,'voy-forme-psychologique-val')"></div>
+            <div class="slider-val" id="voy-forme-psychologique-val">3</div>
+            <div class="slider-label" style="text-align:right">Excellent</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section Staff uniquement (masquée pour entraîneur) -->
+    <div class="section" id="voyage-staff-section" style="display:none">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num teal">3</div>
+        <div class="section-title">Conditions du voyage</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+
+        <!-- Fluidité embarquement -->
+        <div>
+          <label>Fluidité de l'embarquement</label>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <label style="font-size:12px;color:var(--muted)">
+              <input type="checkbox" id="voy-embarquement-nc"> Non concerné
+            </label>
+          </div>
+          <div id="voy-embarquement-wrap">
+            <div class="slider-row">
+              <div class="slider-label">Très difficile</div>
+              <div class="slider-wrap"><input type="range" class="teal-thumb" id="voy-embarquement" min="1" max="5" value="3" oninput="updateSlider(this,'voy-embarquement-val')"></div>
+              <div class="slider-val" id="voy-embarquement-val">3</div>
+              <div class="slider-label" style="text-align:right">Très fluide</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Temps d'attente / retard -->
+        <div>
+          <label>Temps d'attente / retard</label>
+          <div class="pill-group">
+            <div class="pill"><input type="radio" name="voy-attente" id="voy-att-0" value="0"><label for="voy-att-0">Aucun</label></div>
+            <div class="pill"><input type="radio" name="voy-attente" id="voy-att-30" value="<30min"><label for="voy-att-30">&lt; 30 min</label></div>
+            <div class="pill"><input type="radio" name="voy-attente" id="voy-att-1h" value="30min–1h"><label for="voy-att-1h">30 min – 1 h</label></div>
+            <div class="pill"><input type="radio" name="voy-attente" id="voy-att-2h" value="1h–2h"><label for="voy-att-2h">1 h – 2 h</label></div>
+            <div class="pill"><input type="radio" name="voy-attente" id="voy-att-2hp" value=">2h"><label for="voy-att-2hp">&gt; 2 h</label></div>
+          </div>
+        </div>
+
+        <!-- Problème administratif -->
+        <div>
+          <label>Problème administratif (visa, autorisation, etc.)</label>
+          <div class="pill-group">
+            <div class="pill"><input type="radio" name="voy-pb-admin" id="voy-pba-non" value="non"><label for="voy-pba-non">Non</label></div>
+            <div class="pill"><input type="radio" name="voy-pb-admin" id="voy-pba-oui" value="oui"><label for="voy-pba-oui">Oui</label></div>
+          </div>
+          <textarea id="voy-pb-admin-obs" placeholder="Précisions si oui…" style="margin-top:8px;display:none"></textarea>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /zone-voyage -->
+
+  <!-- ════════ HORS PÉRIODE ════════ -->
+  <div id="zone-hors-periode" style="display:none">
+    <div class="hors-periode-card">
+      <div style="font-size:32px;margin-bottom:12px">📅</div>
+      <div style="font-size:14px;font-weight:500;color:var(--muted);margin-bottom:6px">Aucun questionnaire pour cette date</div>
+      <div style="font-size:12px;margin-bottom:10px">Choisissez une date à l'intérieur d'une période configurée pour cette compétition :</div>
+      <div id="hors-periode-list" style="font-size:12px;display:flex;flex-direction:column;gap:4px;align-items:center"></div>
+    </div>
+  </div>
+
+  <!-- ════════ BARRE DE SAUVEGARDE ════════ -->
+  <div class="save-bar" id="save-bar" style="display:none">
+    <div class="save-info" id="save-info">Données non sauvegardées</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" onclick="resetSetup()">← Changer de profil</button>
+      <button class="btn btn-accent" id="save-btn" onclick="saveCurrentPhase()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Sauvegarder
+      </button>
+    </div>
+  </div>
+
+</div><!-- /journal-wrap -->
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://bpdxdljctybdmtemubjh.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwZHhkbGpjdHliZG10ZW11YmpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NzA2MTgsImV4cCI6MjA5NTU0NjYxOH0.b5GKWWTWTsrYPGmVPvexLWqAiQvkMl43Pzo96mz6lQw';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── AFFICHEUR D'ERREURS (diagnostic à distance) ────────────
+function showFatalError(msg) {
+  let box = document.getElementById('fatal-error-box');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'fatal-error-box';
+    box.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#C0392B;color:#fff;padding:12px 16px;font-family:monospace;font-size:12px;line-height:1.5;box-shadow:0 -2px 12px rgba(0,0,0,.3);max-height:40vh;overflow:auto';
+    document.body.appendChild(box);
+  }
+  box.innerHTML = '<strong>⚠️ Erreur détectée</strong> — merci d\'envoyer une capture de ce message :<br>' +
+    String(msg).replace(/</g,'&lt;') +
+    '<br><span style="opacity:.8">Navigateur : ' + navigator.userAgent + '</span>' +
+    '<div style="margin-top:6px"><button onclick="this.closest(\'#fatal-error-box\').remove()" style="background:#fff;color:#C0392B;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:11px">Fermer</button></div>';
+}
+window.addEventListener('error', e => showFatalError((e.message || 'Erreur') + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : '')));
+window.addEventListener('unhandledrejection', e => showFatalError('Promesse rejetée : ' + (e.reason?.message || e.reason)));
+
+// ── ÉTAT GLOBAL ────────────────────────────────────────────
+let activeCompId = null, activeCoachId = null, activeComp = null;
+let activeRole = 'entraineur'; // 'entraineur' | 'staff_responsable'
+let currentDate = new Date().toISOString().split('T')[0];
+let currentPhase = null; // 'precomp' | 'comp' | 'postcomp' | null
+let allNations = [], nationObsData = [];
+let currentEvents = [], resultStates = {};
+let scores     = { commu: null, stress: null, concentration: null, expression: null, decisions: null, presence: null };
+let postScores = { accomp: null, stress: null, commu: null, app: null };
+let existingJournalId = null, existingPrecompId = null, existingPostcompId = null, existingStaffId = null;
+let existingPrecompStaffId = null, existingPostcompStaffId = null, existingVoyageId = null;
+let postcompStaffStars = {};
+
+// ── DÉFINITION DES ITEMS STAFF ─────────────────────────────
+const STAFF_ITEMS = {
+  logistique: [
+    { key:'log_navette',      label:'Navette piscine',   min:'Très difficile', max:'Excellent' },
+    { key:'log_hebergement',  label:'Hébergement',       min:'Très mauvais',   max:'Excellent' },
+    { key:'log_restauration', label:'Restauration',      min:'Très mauvaise',  max:'Excellente' },
+    { key:'log_meteo',        label:'Conditions météo',  min:'Très mauvaises', max:'Idéales' },
+  ],
+  vie: [
+    { key:'vie_forme_responsable', label:'État de forme du responsable d\'équipe', min:'Épuisé', max:'En pleine forme' },
+    { key:'vie_attitude',      label:'Attitude entre les épreuves',               min:'Insuffisante', max:'Exemplaire' },
+    { key:'vie_cohesion',      label:'Cohésion de groupe',                         min:'Faible',       max:'Très forte' },
+    { key:'vie_consignes',     label:'Respect des consignes',                      min:'Non respecté', max:'Exemplaire' },
+    { key:'vie_valeurs',       label:"Respect des valeurs de l'EDF",              min:'Non respecté', max:'Exemplaire' },
+    { key:'vie_temps_libre',   label:'Gestion du temps libre des nageurs',         min:'Mal gérée',    max:'Très bien gérée' },
+    { key:'vie_recuperation',  label:'Qualité des séances de récupération / kiné', min:'Insuffisante', max:'Excellente' },
+    { key:'vie_suivi_medical', label:'Suivi médical quotidien',                    min:'Insuffisant',  max:'Optimal' },
+  ]
+};
+
+// ── RENDER ITEMS STAFF ─────────────────────────────────────
+function renderStaffItems() {
+  const colors = { logistique:'var(--blue-light)', vie:'var(--teal)' };
+  Object.entries(STAFF_ITEMS).forEach(([cat, items]) => {
+    const container = document.getElementById('staff-' + cat + '-body');
+    if (!container) return;
+    // Injecter seulement les items slider (le toggle médecin est en HTML fixe)
+    const existingToggle = container.querySelector('.toggle-row');
+    const existingMedObs = container.querySelector('#medecin-obs-wrap');
+    container.innerHTML = items.map(item => `
+      <div class="staff-item-row">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <div class="staff-item-label">${item.label}${item.hint ? `<small>${item.hint}</small>` : ''}</div>
+          <label style="font-size:11px;color:var(--muted);font-weight:400;cursor:pointer">
+            <input type="checkbox" id="${item.key}-nc" onchange="toggleStaffNC('${item.key}')"> Non concerné
+          </label>
+        </div>
+        <div class="staff-slider-row" id="${item.key}-slider-wrap">
+          <span class="staff-slider-min">${item.min}</span>
+          <div class="slider-wrap">
+            <input type="range" id="${item.key}" min="1" max="5" value="3"
+              style="--c:${colors[cat]}"
+              oninput="updateStaffSlider(this,'${item.key}-val','${colors[cat]}')">
+          </div>
+          <span class="slider-val" id="${item.key}-val">3</span>
+          <span class="staff-slider-max">${item.max}</span>
+        </div>
+        <label style="font-size:11px;color:var(--hint);margin-bottom:3px">Observations</label>
+        <textarea id="${item.key}_obs" placeholder="Observations optionnelles…" style="min-height:55px"></textarea>
+      </div>`).join('');
+    // Ré-attacher les éléments fixes de la section vie
+    if (cat === 'vie' && existingToggle) {
+      container.appendChild(existingToggle);
+      if (existingMedObs) container.appendChild(existingMedObs);
+    }
+    // Init sliders
+    items.forEach(item => updateStaffSlider(document.getElementById(item.key), item.key+'-val', colors[cat]));
+  });
+}
+
+function updateStaffSlider(el, valId, color) {
+  if (!el) return;
+  const v = parseInt(el.value);
+  const ve = document.getElementById(valId); if (ve) ve.textContent = v;
+  const pct = ((v-1)/4)*100;
+  el.style.background = `linear-gradient(to right,${color} ${pct}%,${color} ${pct}%,var(--border) ${pct}%,var(--border) 100%)`;
+}
+
+// ── DÉTECTION DE PHASE ─────────────────────────────────────
+// Liste des périodes configurées pour une compétition (pour l'affichage)
+function getConfiguredPeriods(comp) {
+  if (!comp) return [];
+  const p = [];
+  if (comp.date_stage_debut) p.push({ label: '🏋️ Stage', start: comp.date_stage_debut, end: comp.date_stage_fin || comp.date_stage_debut });
+  if (comp.date_voyage_aller) p.push({ label: '✈️ Voyage aller', start: comp.date_voyage_aller, end: comp.date_voyage_aller });
+  if (comp.date_voyage_retour) p.push({ label: '✈️ Voyage retour', start: comp.date_voyage_retour, end: comp.date_voyage_retour });
+  if (comp.date_debut && comp.date_fin) p.push({ label: '🏊 Compétition', start: comp.date_debut, end: comp.date_fin });
+  if (comp.date_bilan) p.push({ label: '✅ Bilan', start: comp.date_bilan, end: comp.date_bilan });
+  return p.sort((a, b) => a.start.localeCompare(b.start));
+}
+
+// Première date configurée (pour positionner le journal au démarrage)
+function firstConfiguredDate(comp) {
+  const periods = getConfiguredPeriods(comp);
+  return periods.length ? periods[0].start : null;
+}
+
+function detectPhase(dateStr, comp) {
+  if (!comp) return [];
+  const d = dateStr; // string 'YYYY-MM-DD'
+  const phases = [];
+
+  // Compétition (priorité la plus haute)
+  if (comp.date_debut && comp.date_fin && d >= comp.date_debut && d <= comp.date_fin)
+    phases.push('comp');
+
+  // Bilan
+  if (comp.date_bilan && d === comp.date_bilan)
+    phases.push('postcomp');
+
+  // Voyage aller
+  if (comp.date_voyage_aller && d === comp.date_voyage_aller)
+    phases.push('voyage');
+  // Voyage retour (même jour que bilan possible, mais bilan a priorité)
+  else if (comp.date_voyage_retour && d === comp.date_voyage_retour)
+    phases.push('voyage');
+
+  // Stage
+  if (comp.date_stage_debut && comp.date_stage_fin &&
+      d >= comp.date_stage_debut && d <= comp.date_stage_fin)
+    phases.push('stage');
+  // Stage sans date de fin (date unique)
+  else if (comp.date_stage_debut && !comp.date_stage_fin && d === comp.date_stage_debut)
+    phases.push('stage');
+
+  return phases;
+}
+
+function toggleStaffNC(key) {
+  const nc = document.getElementById(key + '-nc').checked;
+  const wrap = document.getElementById(key + '-slider-wrap');
+  if (wrap) wrap.style.display = nc ? 'none' : '';
+  if (nc) {
+    const el = document.getElementById(key);
+    if (el) el.value = null;
+  }
+}
+
+function applyVoyageRole() {
+  const isStaff = activeRole === 'staff_responsable';
+  document.getElementById('voyage-staff-section').style.display = isStaff ? '' : 'none';
+
+  document.getElementById('voy-embarquement-nc').addEventListener('change', function() {
+    document.getElementById('voy-embarquement-wrap').style.display = this.checked ? 'none' : '';
+  });
+
+  document.querySelectorAll('input[name="voy-pb-admin"]').forEach(r => {
+    r.addEventListener('change', () => {
+      document.getElementById('voy-pb-admin-obs').style.display =
+        document.querySelector('input[name="voy-pb-admin"]:checked')?.value === 'oui' ? '' : 'none';
+    });
+  });
+}
+
+function applyPhase(phases) {
+  currentPhase = phases.length > 0 ? phases[0] : null;
+  const zones = ['voyage','precomp','precomp-staff','comp','staff','postcomp','postcomp-staff','hors-periode'];
+  zones.forEach(z => { const el = document.getElementById('zone-'+z); if (el) el.style.display = 'none'; });
+  document.getElementById('save-bar').style.display = 'none';
+
+  // Vider les bandeaux
+  const bannerWrap = document.getElementById('phase-banners');
+  bannerWrap.innerHTML = '';
+  const badge = document.getElementById('jour-label');
+
+  if (phases.length === 0) {
+    document.getElementById('zone-hors-periode').style.display = '';
+    badge.className = 'day-badge'; badge.textContent = 'Hors période';
+    // Lister les périodes configurées pour aider l'utilisateur
+    const listEl = document.getElementById('hors-periode-list');
+    if (listEl) {
+      const periods = getConfiguredPeriods(activeComp);
+      if (!periods.length) {
+        listEl.innerHTML = '<span style="color:var(--hint)">Aucune date n\'a encore été configurée pour cette compétition (voir l\'administration).</span>';
+      } else {
+        const fmt = d => { const [y,m,dd] = d.split('-'); return `${dd}/${m}/${y.slice(2)}`; };
+        listEl.innerHTML = periods.map(p => {
+          const range = p.start === p.end ? fmt(p.start) : `${fmt(p.start)} → ${fmt(p.end)}`;
+          return `<button class="btn btn-sm" onclick="goToDate('${p.start}')" style="cursor:pointer">${p.label} : ${range}</button>`;
+        }).join('');
+      }
+    }
+    return;
+  }
+
+  // Libellé badge jour = concaténation des phases
+  const badgeLabels = { stage:'Stage', voyage:'Voyage', comp:'Compétition', postcomp:'Bilan J+1', precomp:'Pré-comp' };
+  const badgeClasses = { stage:'badge-precomp', voyage:'badge-staff', comp:'badge-comp', postcomp:'badge-postcomp', precomp:'badge-precomp' };
+  badge.className = 'day-badge ' + badgeClasses[phases[0]];
+  badge.textContent = phases.map(p => badgeLabels[p] || p).join(' · ');
+
+  phases.forEach(phase => {
+    // Créer le bandeau pour cette phase
+    const banner = document.createElement('div');
+    if (phase === 'stage') {
+      banner.className = 'phase-banner precomp';
+      banner.innerHTML = '<span class="phase-icon">🏋️</span><span>Journal de stage</span>';
+      bannerWrap.appendChild(banner);
+      if (activeRole === 'staff_responsable') {
+        document.getElementById('zone-precomp-staff').style.display = '';
+      } else {
+        document.getElementById('zone-precomp').style.display = '';
+      }
+    } else if (phase === 'voyage') {
+      banner.className = 'phase-banner staff';
+      banner.innerHTML = '<span class="phase-icon">✈️</span><span>Jour de voyage</span>';
+      bannerWrap.appendChild(banner);
+      document.getElementById('zone-voyage').style.display = '';
+      applyVoyageRole();
+    } else if (phase === 'precomp') {
+      if (activeRole === 'staff_responsable') {
+        banner.className = 'phase-banner staff';
+        banner.innerHTML = '<span class="phase-icon">🏋️</span><span>Préparation — Responsable d\'équipe</span>';
+        bannerWrap.appendChild(banner);
+        document.getElementById('zone-precomp-staff').style.display = '';
+      } else {
+        banner.className = 'phase-banner precomp';
+        banner.innerHTML = '<span class="phase-icon">🏋️</span><span>Période de préparation — J-14 à J-1</span>';
+        bannerWrap.appendChild(banner);
+        document.getElementById('zone-precomp').style.display = '';
+      }
+    } else if (phase === 'comp') {
+      if (activeRole === 'staff_responsable') {
+        banner.className = 'phase-banner staff';
+        banner.innerHTML = '<span class="phase-icon">📋</span><span>Journal staff — responsable d\'équipe</span>';
+        bannerWrap.appendChild(banner);
+        document.getElementById('zone-staff').style.display = '';
+      } else {
+        banner.className = 'phase-banner comp';
+        banner.innerHTML = '<span class="phase-icon">🏊</span><span>Journal de compétition</span>';
+        bannerWrap.appendChild(banner);
+        document.getElementById('zone-comp').style.display = '';
+      }
+    } else if (phase === 'postcomp') {
+      if (activeRole === 'staff_responsable') {
+        banner.className = 'phase-banner staff';
+        banner.innerHTML = '<span class="phase-icon">✅</span><span>Bilan post-compétition — Responsable d\'équipe</span>';
+        bannerWrap.appendChild(banner);
+        document.getElementById('zone-postcomp-staff').style.display = '';
+      } else {
+        banner.className = 'phase-banner postcomp';
+        banner.innerHTML = '<span class="phase-icon">✅</span><span>Bilan de compétition — J+1</span>';
+        bannerWrap.appendChild(banner);
+        document.getElementById('zone-postcomp').style.display = '';
+      }
+    }
+  });
+}
+
+// ── SETUP ──────────────────────────────────────────────────
+async function initSetup() {
+  const { data: comps } = await sb.from('competitions').select('*').order('date_debut', { ascending: false });
+  const sel = document.getElementById('setup-comp');
+  (comps || []).forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.nom; sel.appendChild(o); });
+  const { data: nations } = await sb.from('nations').select('*').order('nom');
+  allNations = nations || [];
+}
+
+async function onSetupCompChange() {
+  activeCompId = document.getElementById('setup-comp').value;
+  const coachSel = document.getElementById('setup-coach');
+  coachSel.innerHTML = '<option value="">— Choisir —</option>';
+  coachSel.disabled = !activeCompId;
+  document.getElementById('role-indicator').className = 'role-indicator';
+  if (!activeCompId) return;
+  const { data: compData } = await sb.from('competitions').select('id, nom, date_stage_debut, date_stage_fin, date_voyage_aller, date_voyage_retour, date_debut, date_fin, date_bilan').eq('id', activeCompId).single();
+  activeComp = compData;
+  const { data } = await sb.from('competition_coaches').select('*, coaches(*)').eq('competition_id', activeCompId);
+  (data || []).forEach(r => {
+    const o = document.createElement('option');
+    o.value = r.coach_id;
+    o.dataset.role = r.coaches.role || 'entraineur';
+    o.textContent = r.coaches.prenom + ' ' + r.coaches.nom + (r.coaches.role === 'staff_responsable' ? ' ★' : '');
+    coachSel.appendChild(o);
+  });
+}
+
+function onCoachChange() {
+  const sel = document.getElementById('setup-coach');
+  const opt = sel.options[sel.selectedIndex];
+  const role = opt?.dataset?.role || 'entraineur';
+  const ind = document.getElementById('role-indicator');
+  if (!opt?.value) { ind.className = 'role-indicator'; return; }
+  if (role === 'staff_responsable') {
+    ind.className = 'role-indicator staff';
+    ind.textContent = '★ Profil Responsable d\'équipe — questionnaire staff';
+  } else {
+    ind.className = 'role-indicator entraineur';
+    ind.textContent = 'Profil Entraîneur — journal de bord';
+  }
+}
+
+async function startJournal() {
+  activeCoachId = document.getElementById('setup-coach').value;
+  activeCompId  = document.getElementById('setup-comp').value;
+  if (!activeCoachId || !activeCompId) return toast('Sélectionner compétition et profil', 'error');
+
+  const sel = document.getElementById('setup-coach');
+  const opt = sel.options[sel.selectedIndex];
+  activeRole = opt?.dataset?.role || 'entraineur';
+
+  document.getElementById('header-coach-name').textContent = opt.textContent.replace(' ★','');
+  // Adapter le header selon le rôle
+  const logo = document.getElementById('header-logo');
+  const badge = document.getElementById('role-badge');
+  if (activeRole === 'staff_responsable') {
+    logo.classList.add('staff');
+    badge.classList.add('visible');
+  } else {
+    logo.classList.remove('staff');
+    badge.classList.remove('visible');
+  }
+
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('journal-wrap').style.display = 'block';
+
+  // Garantir que les dates de la compétition sont chargées (évite une course
+  // réseau : clic « Ouvrir » avant la fin du préchargement async => activeComp null
+  // => detectPhase renvoie [] => "Hors période" sur toutes les dates).
+  if (!activeComp || activeComp.id !== activeCompId) {
+    const { data: compData, error } = await sb.from('competitions')
+      .select('id, nom, date_stage_debut, date_stage_fin, date_voyage_aller, date_voyage_retour, date_debut, date_fin, date_bilan')
+      .eq('id', activeCompId).single();
+    if (error || !compData) {
+      showFatalError('Impossible de charger les dates de la compétition : ' + (error?.message || 'introuvable'));
+      return;
+    }
+    activeComp = compData;
+  }
+
+  // Ouvrir sur la première date configurée de la compétition (sinon aujourd'hui)
+  const startDate = firstConfiguredDate(activeComp) || currentDate;
+  currentDate = startDate;
+  document.getElementById('jour-date').value = startDate;
+  updateDayLabel(startDate);
+
+  initScoreButtons();
+  if (activeRole === 'staff_responsable') renderStaffItems();
+  await loadDayData(startDate);
+}
+
+function resetSetup() {
+  document.getElementById('setup-screen').style.display = '';
+  document.getElementById('journal-wrap').style.display = 'none';
+  activeCompId = activeCoachId = activeComp = null;
+}
+
+// ── CHARGEMENT DU JOUR ─────────────────────────────────────
+async function onDateChange() {
+  currentDate = document.getElementById('jour-date').value;
+  updateDayLabel(currentDate);
+  await loadDayData(currentDate);
+}
+
+// Aller à une date précise (depuis les raccourcis "Hors période")
+async function goToDate(date) {
+  document.getElementById('jour-date').value = date;
+  currentDate = date;
+  updateDayLabel(date);
+  await loadDayData(date);
+}
+
+async function loadDayData(date) {
+ try {
+  const phases = detectPhase(date, activeComp);
+  applyPhase(phases);
+
+  if (phases.includes('stage')) {
+    if (activeRole === 'staff_responsable') {
+      const { data } = await sb.from('precomp_staff_entries').select('*').eq('competition_id', activeCompId).eq('coach_id', activeCoachId).eq('date_entree', date).maybeSingle();
+      existingPrecompStaffId = data?.id || null;
+      fillPrecompStaffForm(data);
+    } else {
+      const { data } = await sb.from('precomp_entries').select('*').eq('competition_id', activeCompId).eq('coach_id', activeCoachId).eq('date_entree', date).maybeSingle();
+      existingPrecompId = data?.id || null;
+      fillPrecompForm(data);
+    }
+  }
+  if (phases.includes('voyage')) {
+    const { data } = await sb.from('voyage_entries')
+      .select('*')
+      .eq('competition_id', activeCompId)
+      .eq('coach_id', activeCoachId)
+      .eq('date_entree', date)
+      .maybeSingle();
+    existingVoyageId = data?.id || null;
+    fillVoyageForm(data);
+  }
+  if (phases.includes('precomp')) {
+    if (activeRole === 'staff_responsable') {
+      const { data } = await sb.from('precomp_staff_entries').select('*').eq('competition_id', activeCompId).eq('coach_id', activeCoachId).eq('date_entree', date).maybeSingle();
+      existingPrecompStaffId = data?.id || null;
+      fillPrecompStaffForm(data);
+    } else {
+      const { data } = await sb.from('precomp_entries').select('*').eq('competition_id', activeCompId).eq('coach_id', activeCoachId).eq('date_entree', date).maybeSingle();
+      existingPrecompId = data?.id || null;
+      fillPrecompForm(data);
+    }
+  }
+  if (phases.includes('comp')) {
+    if (activeRole === 'staff_responsable') {
+      const { data } = await sb.from('staff_entries').select('*').eq('competition_id', activeCompId).eq('coach_id', activeCoachId).eq('date_entree', date).maybeSingle();
+      existingStaffId = data?.id || null;
+      fillStaffForm(data);
+    } else {
+      const { data: events } = await sb.from('events').select('*, athletes(*)').eq('competition_id', activeCompId).eq('date_epreuve', date).order('heure');
+      currentEvents = events || [];
+      const { data: existingResults } = await sb.from('results').select('*').eq('competition_id', activeCompId).eq('coach_id', activeCoachId).in('event_id', currentEvents.map(e => e.id));
+      resultStates = {};
+      (existingResults || []).forEach(r => { resultStates[r.event_id] = { id: r.id, a_nage: r.a_nage, temps: r.temps, rang: r.rang, observations: r.observations }; });
+      renderResultsTable();
+      const { data: journal } = await sb.from('journal_entries').select('*').eq('competition_id', activeCompId).eq('coach_id', activeCoachId).eq('date_entree', date).maybeSingle();
+      existingJournalId = journal?.id || null;
+      fillJournalForm(journal);
+      await loadNationObs(date);
+      if (activeRole === 'entraineur') loadNonCompetitors(date);
+    }
+  }
+  if (phases.includes('postcomp')) {
+    if (activeRole === 'staff_responsable') {
+      const { data } = await sb.from('postcomp_staff_entries').select('*').eq('competition_id', activeCompId).eq('coach_id', activeCoachId).maybeSingle();
+      existingPostcompStaffId = data?.id || null;
+      fillPostcompStaffForm(data);
+      await loadPostcompPerformances();
+    } else {
+      const { data } = await sb.from('postcomp_entries').select('*').eq('competition_id', activeCompId).eq('coach_id', activeCoachId).maybeSingle();
+      existingPostcompId = data?.id || null;
+      fillPostcompForm(data);
+    }
+  }
+ } catch (err) {
+   showFatalError('Chargement du jour (' + date + ') : ' + (err?.message || err));
+   throw err;
+ }
+}
+
+// ── FILL PRÉ-COMP ──────────────────────────────────────────
+function fillPrecompForm(d) {
+  const sliders = ['pre-phys-charge','pre-phys-fatigue','pre-mental-motivation','pre-mental-confiance','pre-mental-anxiete','pre-forme-generale','pre-relation-qualite'];
+  sliders.forEach(id => {
+    const el = document.getElementById(id); if (!el) return;
+    const dbKey = id.replace(/^pre-/,'').replace(/-/g,'_');
+    el.value = d?.[dbKey] || 3;
+    updateSlider(el, id+'-val');
+    const obs = document.getElementById(id+'-obs');
+    if (obs) obs.value = d?.[dbKey+'_obs'] || '';
+  });
+  [['pre-forme-sensations','forme_sensations'],['pre-relation-incidents','relation_incidents'],['pre-points-attention','points_attention'],['pre-objectifs-rappel','objectifs_rappel'],['pre-scenarios','scenarios_anticipes'],['pre-plans-contingence','plans_contingence']].forEach(([hid, dbk]) => {
+    const el = document.getElementById(hid); if (el) el.value = d?.[dbk] || '';
+  });
+  updateSaveStatus(d?.updated_at);
+}
+
+// ── FILL JOURNAL ENTRAÎNEUR ────────────────────────────────
+function fillJournalForm(j) {
+  document.querySelectorAll('input[name="etat"]').forEach(r => r.checked = (j && r.value === j.etat_groupe));
+  document.getElementById('obs-contexte').value    = j?.observations_contexte || '';
+  document.getElementById('gestion-emotions').value= j?.gestion_emotions || '';
+  document.getElementById('obs-forme').value        = j?.observations_forme || '';
+  const fp = document.getElementById('forme-physique'); fp.value = j?.forme_physique || 3; updateSlider(fp,'val-physique');
+  const fq = document.getElementById('forme-psychologique'); fq.value = j?.forme_psychologique || 3; updateSlider(fq,'val-psycho');
+  document.getElementById('ce-quaurais-fait').value = j?.ce_quaurais_fait || '';
+  document.getElementById('apprentissages').value   = j?.apprentissages || '';
+  document.getElementById('questions-jour').value   = j?.questions || '';
+  document.getElementById('mot-du-jour').value      = j?.mot_du_jour || '';
+  document.querySelectorAll('#themes-group input[type=checkbox]').forEach(c => c.checked = (j?.themes||[]).includes(c.value));
+  const scoreMap = { commu:'eval_communication', stress:'eval_stress', concentration:'eval_concentration', expression:'eval_expression_emotions', decisions:'eval_decisions', presence:'eval_presence' };
+  Object.entries(scoreMap).forEach(([k, db]) => {
+    scores[k] = j?.[db] || 3;
+    const slider = document.getElementById('eval-'+k);
+    if (slider) { slider.value = scores[k]; updateSlider(slider, 'eval-'+k+'-val'); }
+  });
+  updateSaveStatus(j?.updated_at);
+}
+
+// ── FILL STAFF ─────────────────────────────────────────────
+function fillStaffForm(d) {
+  const allItems = [...STAFF_ITEMS.logistique, ...STAFF_ITEMS.vie];
+  allItems.forEach(item => {
+    const sl = document.getElementById(item.key);
+    if (sl) { sl.value = d?.[item.key] || 3; updateStaffSlider(sl, item.key+'-val', sl.style.background.includes('teal') ? 'var(--teal)' : sl.style.background.includes('accent') ? 'var(--accent)' : 'var(--blue-light)'); }
+    const obs = document.getElementById(item.key+'_obs');
+    if (obs) obs.value = d?.[item.key+'_obs'] || '';
+  });
+  // Re-init les sliders avec la bonne couleur via updateStaffSlider
+  const colors = { log:'var(--blue-light)', vie:'var(--teal)' };
+  allItems.forEach(item => {
+    const cat = item.key.startsWith('log_') ? 'log' : 'vie';
+    const sl = document.getElementById(item.key);
+    if (sl) updateStaffSlider(sl, item.key+'-val', colors[cat]);
+  });
+  const med = document.getElementById('vie-medecin');
+  if (med) { med.checked = d?.vie_medecin || false; document.getElementById('medecin-obs-wrap').style.display = med.checked ? '' : 'none'; }
+  const medObs = document.getElementById('vie-medecin-obs');
+  if (medObs) medObs.value = d?.vie_medecin_obs || '';
+  const obs = document.getElementById('staff-obs-generales');
+  if (obs) obs.value = d?.observations_generales || '';
+  updateSaveStatus(d?.updated_at);
+}
+
+// ── FILL POST-COMP ─────────────────────────────────────────
+function fillPostcompForm(d) {
+  const dbMap = { 'post-bilan-perf':'bilan_performances','post-surprises-pos':'surprises_positives','post-surprises-neg':'surprises_negatives','post-app1':'apprentissage_1','post-app2':'apprentissage_2','post-app3':'apprentissage_3','post-modif':'modifications_retour','post-nations':'pratiques_etrangeres','post-vecu':'vecu_marquant','post-message':'message_collegues' };
+  Object.entries(dbMap).forEach(([hid, dbk]) => { const el = document.getElementById(hid); if (el) el.value = d?.[dbk] || ''; });
+  const psMap = { accomp:'eval_accompagnement', stress:'eval_gestion_stress', commu:'eval_communication', app:'eval_apprentissages' };
+  Object.entries(psMap).forEach(([k, db]) => {
+    postScores[k] = d?.[db] || null;
+    document.getElementById('post-scores-'+k)?.querySelectorAll('.score-btn').forEach((b,i) => b.classList.toggle('active', i+1 === postScores[k]));
+  });
+  updateSaveStatus(d?.updated_at);
+}
+
+// ── RÉSULTATS ──────────────────────────────────────────────
+function renderResultsTable() {
+  const tbody = document.getElementById('results-tbody');
+  if (!currentEvents.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--hint);font-size:13px">Aucune épreuve prévue ce jour</td></tr>'; return;
+  }
+  tbody.innerHTML = currentEvents.map(ev => {
+    const rs = resultStates[ev.id] || {};
+    const anage = rs.a_nage !== undefined ? rs.a_nage : true;
+    const tourClass = ev.tour==='finale' ? 'tour-finale' : ev.tour==='demi-finale' ? 'tour-demi' : 'tour-serie';
+    const te = ev.temps_engagement ? `<br><span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--hint)">Réf: ${ev.temps_engagement}</span>` : '';
+    return `<tr>
+      <td><strong style="font-size:12px">${ev.athletes.prenom}<br>${ev.athletes.nom}</strong></td>
+      <td style="font-size:12px">${ev.epreuve}${ev.heure?'<br><span style="color:var(--hint);font-size:11px;font-family:DM Mono,monospace">'+ev.heure.slice(0,5)+'</span>':''}${te}</td>
+      <td><span class="tour-badge ${tourClass}">${ev.tour}</span></td>
+      <td><div class="nage-toggle">
+        <button class="nage-btn ${anage?'oui':''}" onclick="setNage('${ev.id}',true,this)">✓ Oui</button>
+        <button class="nage-btn ${!anage?'non':''}" onclick="setNage('${ev.id}',false,this)">✕ Non</button>
+      </div></td>
+      <td><input type="text" value="${rs.temps||''}" placeholder="58.42" style="width:70px" oninput="setResult('${ev.id}','temps',this.value)"></td>
+      <td><input type="text" value="${rs.rang||''}"  placeholder="4"     style="width:45px" oninput="setResult('${ev.id}','rang',this.value)"></td>
+      <td><input type="text" value="${rs.observations||''}" placeholder="Observations…" oninput="setResult('${ev.id}','observations',this.value)"></td>
+    </tr>`;
+  }).join('');
+}
+function setNage(eid, val, btn) {
+  if (!resultStates[eid]) resultStates[eid] = {};
+  resultStates[eid].a_nage = val;
+  btn.closest('tr').querySelectorAll('.nage-btn').forEach(b => b.className='nage-btn');
+  btn.classList.add(val ? 'oui' : 'non');
+}
+function setResult(eid, f, v) { if (!resultStates[eid]) resultStates[eid] = {}; resultStates[eid][f] = v; }
+
+// ── NON-COMPÉTITEURS ────────────────────────────────────────
+async function loadNonCompetitors(date) {
+  const container = document.getElementById('noncomp-list');
+  if (!container || !activeCompId || !activeCoachId) return;
+
+  // Récupérer les nageurs liés à cet entraîneur dans cette compétition
+  const { data: linked } = await sb
+    .from('competition_athletes')
+    .select('athlete_id, athletes(id, prenom, nom)')
+    .eq('competition_id', activeCompId)
+    .eq('coach_id', activeCoachId);
+
+  if (!linked || !linked.length) {
+    container.innerHTML = '<div class="empty" style="padding:8px;font-size:12px">Aucun nageur associé</div>';
+    return;
+  }
+
+  // Récupérer les épreuves du jour avec leur session (matin = serie/demi-finale, AM = finale)
+  const { data: eventsToday } = await sb
+    .from('events')
+    .select('athlete_id, tour, a_nage')
+    .eq('competition_id', activeCompId)
+    .eq('date_epreuve', date);
+
+  // Récupérer les résultats pour savoir si a_nage = false
+  const { data: results } = await sb
+    .from('results')
+    .select('event_id, a_nage, events!inner(athlete_id, tour, date_epreuve)')
+    .eq('competition_id', activeCompId)
+    .eq('events.date_epreuve', date);
+
+  // Construire un set d'athletes compétiteurs par session
+  const compMatin = new Set(); // séries et demi-finales
+  const compAM    = new Set(); // finales
+
+  (eventsToday || []).forEach(ev => {
+    // Vérifier si le nageur a coché "a nagé = non" dans ses résultats
+    const res = (results || []).find(r => r.events?.athlete_id === ev.athlete_id && r.events?.tour === ev.tour);
+    const aNage = res ? res.a_nage : true; // par défaut on suppose qu'il nage
+    if (!aNage) return; // marqué non-participant => il va à l'entraînement
+
+    if (ev.tour === 'serie' || ev.tour === 'demi-finale') compMatin.add(ev.athlete_id);
+    if (ev.tour === 'finale') compAM.add(ev.athlete_id);
+  });
+
+  // Générer le tableau
+  const rows = linked.map(l => {
+    const a = l.athletes;
+    const enMatin = compMatin.has(l.athlete_id);
+    const enAM    = compAM.has(l.athlete_id);
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px;font-weight:500">${a.prenom} ${a.nom}</span>
+        <div style="display:flex;gap:12px">
+          <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="nc-matin-${a.id}" ${!enMatin ? 'checked' : ''}
+              onchange="saveNonComp('${a.id}','matin',this.checked)">
+            Matin
+          </label>
+          <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="nc-am-${a.id}" ${!enAM ? 'checked' : ''}
+              onchange="saveNonComp('${a.id}','am',this.checked)">
+            Après-midi
+          </label>
+        </div>
+      </div>`;
+  }).join('');
+
+  container.innerHTML = rows || '<div class="empty" style="padding:8px;font-size:12px">Tous les nageurs sont en compétition</div>';
+}
+
+function saveNonComp(athleteId, session, present) {
+  // Stockage local uniquement (intégré à saveCurrentPhase si besoin)
+  // La valeur est lue au moment de la sauvegarde
+}
+
+// ── NATIONS ────────────────────────────────────────────────
+async function loadNationObs(date) {
+  const { data } = await sb.from('nation_observations').select('*, nations(*)').eq('competition_id', activeCompId).eq('coach_id', activeCoachId).eq('date_obs', date);
+  nationObsData = data || []; renderNationObs();
+}
+function renderNationObs() {
+  const c = document.getElementById('nations-obs-list');
+  c.innerHTML = nationObsData.map((obs, i) => `
+    <div class="nation-obs-card">
+      <div class="nation-head">
+        <strong style="font-size:13px">${obs.nations.nom} <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--hint)">${obs.nations.code}</span></strong>
+        <button class="btn btn-sm btn-danger" onclick="deleteNationObs('${obs.id}',${i})">✕</button>
+      </div>
+      <div style="margin-bottom:8px"><label>Observation</label><textarea style="min-height:60px" data-obs="${obs.id}" data-field="observation" onchange="updateNationObs(this)">${obs.observation||''}</textarea></div>
+      <div><label>Ce que j'aimerais tester / retenir</label><textarea style="min-height:50px" data-obs="${obs.id}" data-field="a_retenir" onchange="updateNationObs(this)">${obs.a_retenir||''}</textarea></div>
+    </div>`).join('');
+}
+async function updateNationObs(el) { await sb.from('nation_observations').update({ [el.dataset.field]: el.value }).eq('id', el.dataset.obs); }
+async function deleteNationObs(id, i) {
+  await sb.from('nation_observations').delete().eq('id', id);
+  nationObsData.splice(i, 1); renderNationObs(); toast('Observation supprimée');
+}
+function addNationObs() {
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(10,22,40,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.id = 'nation-modal';
+  modal.innerHTML = `<div style="background:#fff;border-radius:12px;padding:1.5rem;width:420px;max-width:100%">
+    <div style="font-size:16px;font-weight:600;color:var(--navy);margin-bottom:1rem">Ajouter une observation nation</div>
+    <div style="margin-bottom:10px"><label>Nation</label><select id="modal-nation" style="width:100%"><option value="">—</option>${allNations.map(n=>`<option value="${n.id}">${n.nom}</option>`).join('')}</select></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
+      <button class="btn" onclick="document.getElementById('nation-modal').remove()">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmAddNationObs(this)">Ajouter</button>
+    </div></div>`;
+  document.body.appendChild(modal);
+}
+async function confirmAddNationObs(btn) {
+  const nationId = document.getElementById('modal-nation').value;
+  if (!nationId) return toast('Choisir une nation', 'error');
+  const { data, error } = await sb.from('nation_observations').insert({ competition_id: activeCompId, coach_id: activeCoachId, nation_id: nationId, date_obs: currentDate, observation: '', a_retenir: '' }).select('*, nations(*)').single();
+  if (error) return toast('Erreur', 'error');
+  document.getElementById('nation-modal').remove();
+  nationObsData.push(data); renderNationObs();
+}
+
+// ── SAUVEGARDE ─────────────────────────────────────────────
+async function saveCurrentPhase() {
+  if      (currentPhase === 'stage'    && activeRole === 'staff_responsable') await savePrecompStaff();
+  else if (currentPhase === 'stage')    await savePrecomp();
+  else if (currentPhase === 'voyage')   await saveVoyage();
+  else if (currentPhase === 'precomp'  && activeRole === 'staff_responsable') await savePrecompStaff();
+  else if (currentPhase === 'precomp')  await savePrecomp();
+  else if (currentPhase === 'comp'    && activeRole === 'staff_responsable') await saveStaff();
+  else if (currentPhase === 'comp')     await saveComp();
+  else if (currentPhase === 'postcomp' && activeRole === 'staff_responsable') await savePostcompStaff();
+  else if (currentPhase === 'postcomp') await savePostcomp();
+}
+
+// ── FILL & SAVE VOYAGE ─────────────────────────────────────
+function fillVoyageForm(d) {
+  if (d?.type_journee) {
+    document.querySelectorAll('input[name="voyage-type"]').forEach(r => r.checked = (r.value === d.type_journee));
+  }
+  const fp = document.getElementById('voy-forme-physique'); if (fp) { fp.value = d?.forme_physique || 3; updateSlider(fp,'voy-forme-physique-val'); }
+  const fq = document.getElementById('voy-forme-psychologique'); if (fq) { fq.value = d?.forme_psychologique || 3; updateSlider(fq,'voy-forme-psychologique-val'); }
+  const qv = document.getElementById('voy-qualite-voyage'); if (qv) { qv.value = d?.qualite_voyage || 3; updateSlider(qv,'voy-qualite-voyage-val'); }
+  if (d?.ambiance_groupe) {
+    document.querySelectorAll('input[name="voyage-ambiance"]').forEach(r => r.checked = (r.value === d.ambiance_groupe));
+  }
+  const inc = document.getElementById('voy-incidents'); if (inc) inc.value = d?.incidents || '';
+  updateSaveStatus(d?.updated_at);
+}
+
+async function saveVoyage() {
+  const typeJournee = document.querySelector('input[name="voyage-type"]:checked')?.value || null;
+  const ambiance    = document.querySelector('input[name="voyage-ambiance"]:checked')?.value || null;
+  const payload = {
+    competition_id: activeCompId, coach_id: activeCoachId, date_entree: currentDate,
+    type_journee: typeJournee,
+    forme_physique: parseInt(document.getElementById('voy-forme-physique')?.value || 3),
+    forme_psychologique: parseInt(document.getElementById('voy-forme-psychologique')?.value || 3),
+    qualite_voyage: parseInt(document.getElementById('voy-qualite-voyage')?.value || 3),
+    ambiance_groupe: ambiance,
+    incidents: document.getElementById('voy-incidents')?.value || '',
+  };
+  let error;
+  if (existingVoyageId) { ({error} = await sb.from('voyage_entries').update(payload).eq('id', existingVoyageId)); }
+  else { const {data,error:e} = await sb.from('voyage_entries').insert(payload).select().single(); error=e; if(!e) existingVoyageId=data.id; }
+  if (error) return toast('Erreur : '+error.message, 'error');
+  toast('✓ Sauvegardé','success'); updateSaveStatus(new Date().toISOString());
+}
+
+async function savePrecomp() {
+  const g  = id => document.getElementById(id)?.value || '';
+  const gi = id => parseInt(document.getElementById(id)?.value || 3);
+  const payload = {
+    competition_id: activeCompId, coach_id: activeCoachId, date_entree: currentDate,
+    phys_charge: gi('pre-phys-charge'), phys_charge_obs: g('pre-phys-charge-obs'),
+    phys_fatigue: gi('pre-phys-fatigue'), phys_fatigue_obs: g('pre-phys-fatigue-obs'),
+    mental_motivation: gi('pre-mental-motivation'), mental_motivation_obs: g('pre-mental-motivation-obs'),
+    mental_confiance: gi('pre-mental-confiance'),   mental_confiance_obs: g('pre-mental-confiance-obs'),
+    mental_anxiete: gi('pre-mental-anxiete'),       mental_anxiete_obs: g('pre-mental-anxiete-obs'),
+    forme_generale: gi('pre-forme-generale'),        forme_sensations: g('pre-forme-sensations'),
+    relation_qualite: gi('pre-relation-qualite'),   relation_qualite_obs: g('pre-relation-qualite-obs'),
+    relation_incidents: g('pre-relation-incidents'), points_attention: g('pre-points-attention'),
+    objectifs_rappel: g('pre-objectifs-rappel'),
+    scenarios_anticipes: g('pre-scenarios'), plans_contingence: g('pre-plans-contingence'),
+  };
+  let error;
+  if (existingPrecompId) { ({error} = await sb.from('precomp_entries').update(payload).eq('id', existingPrecompId)); }
+  else { const {data,error:e} = await sb.from('precomp_entries').insert(payload).select().single(); error=e; if(!e) existingPrecompId=data.id; }
+  if (error) return toast('Erreur : '+error.message, 'error');
+  toast('✓ Sauvegardé','success'); updateSaveStatus(new Date().toISOString());
+}
+
+async function saveComp() {
+  const themes = [...document.querySelectorAll('#themes-group input[type=checkbox]:checked')].map(c => c.value);
+  const etat   = document.querySelector('input[name="etat"]:checked')?.value || null;
+  const payload = {
+    competition_id: activeCompId, coach_id: activeCoachId, date_entree: currentDate,
+    etat_groupe: etat,
+    observations_contexte: document.getElementById('obs-contexte').value,
+    gestion_emotions: document.getElementById('gestion-emotions').value,
+    observations_forme: document.getElementById('obs-forme').value,
+    forme_physique: parseInt(document.getElementById('forme-physique').value),
+    forme_psychologique: parseInt(document.getElementById('forme-psychologique').value),
+    eval_communication: parseInt(document.getElementById('eval-commu').value),
+    eval_stress: parseInt(document.getElementById('eval-stress').value),
+    eval_concentration: parseInt(document.getElementById('eval-concentration').value),
+    eval_expression_emotions: parseInt(document.getElementById('eval-expression').value),
+    eval_decisions: parseInt(document.getElementById('eval-decisions').value),
+    eval_presence: parseInt(document.getElementById('eval-presence').value),
+    ce_quaurais_fait: document.getElementById('ce-quaurais-fait').value,
+    apprentissages: document.getElementById('apprentissages').value,
+    questions: document.getElementById('questions-jour').value,
+    themes, mot_du_jour: document.getElementById('mot-du-jour').value,
+  };
+  let error;
+  if (existingJournalId) { ({error} = await sb.from('journal_entries').update(payload).eq('id', existingJournalId)); }
+  else { const {data,error:e} = await sb.from('journal_entries').insert(payload).select().single(); error=e; if(!e) existingJournalId=data.id; }
+  if (error) return toast('Erreur journal : '+error.message, 'error');
+  for (const ev of currentEvents) {
+    const rs = resultStates[ev.id]; if (!rs) continue;
+    const p = { competition_id: activeCompId, event_id: ev.id, coach_id: activeCoachId, a_nage: rs.a_nage !== undefined ? rs.a_nage : true, temps: rs.temps||null, rang: rs.rang ? parseInt(rs.rang) : null, observations: rs.observations||null };
+    if (rs.id) { await sb.from('results').update(p).eq('id', rs.id); }
+    else { const {data} = await sb.from('results').insert(p).select().single(); if(data) resultStates[ev.id].id=data.id; }
+  }
+  toast('✓ Journal sauvegardé','success'); updateSaveStatus(new Date().toISOString());
+}
+
+async function saveStaff() {
+  const allItems = [...STAFF_ITEMS.logistique, ...STAFF_ITEMS.vie];
+  const payload = {
+    competition_id: activeCompId, coach_id: activeCoachId, date_entree: currentDate,
+    vie_medecin: document.getElementById('vie-medecin')?.checked || false,
+    vie_medecin_obs: document.getElementById('vie-medecin-obs')?.value || '',
+    observations_generales: document.getElementById('staff-obs-generales')?.value || '',
+  };
+  allItems.forEach(item => {
+    const sl = document.getElementById(item.key); if (sl) payload[item.key] = parseInt(sl.value);
+    const obs = document.getElementById(item.key+'_obs'); if (obs) payload[item.key+'_obs'] = obs.value;
+  });
+  let error;
+  if (existingStaffId) { ({error} = await sb.from('staff_entries').update(payload).eq('id', existingStaffId)); }
+  else { const {data,error:e} = await sb.from('staff_entries').insert(payload).select().single(); error=e; if(!e) existingStaffId=data.id; }
+  if (error) return toast('Erreur : '+error.message, 'error');
+  toast('✓ Sauvegardé','success'); updateSaveStatus(new Date().toISOString());
+}
+
+async function savePostcomp() {
+  const g = id => document.getElementById(id)?.value || '';
+  const payload = {
+    competition_id: activeCompId, coach_id: activeCoachId,
+    bilan_performances: g('post-bilan-perf'), surprises_positives: g('post-surprises-pos'), surprises_negatives: g('post-surprises-neg'),
+    apprentissage_1: g('post-app1'), apprentissage_2: g('post-app2'), apprentissage_3: g('post-app3'),
+    modifications_retour: g('post-modif'), pratiques_etrangeres: g('post-nations'),
+    vecu_marquant: g('post-vecu'), message_collegues: g('post-message'),
+    eval_accompagnement: postScores.accomp, eval_gestion_stress: postScores.stress,
+    eval_communication: postScores.commu,   eval_apprentissages: postScores.app,
+  };
+  let error;
+  if (existingPostcompId) { ({error} = await sb.from('postcomp_entries').update(payload).eq('id', existingPostcompId)); }
+  else { const {data,error:e} = await sb.from('postcomp_entries').insert(payload).select().single(); error=e; if(!e) existingPostcompId=data.id; }
+  if (error) return toast('Erreur : '+error.message, 'error');
+  toast('✓ Bilan sauvegardé','success'); updateSaveStatus(new Date().toISOString());
+}
+
+// ── SCORE BUTTONS (POSTCOMP ONLY) ──────────────────────────
+function initScoreButtons() {
+  ['accomp','stress','commu','app'].forEach(key => {
+    const c = document.getElementById('post-scores-'+key); if (!c) return; c.innerHTML = '';
+    for (let n=1; n<=5; n++) {
+      const btn = document.createElement('button'); btn.className='score-btn'; btn.textContent=n;
+      btn.onclick = () => { postScores[key]=n; c.querySelectorAll('.score-btn').forEach((b,i) => b.classList.toggle('active',i+1===n)); };
+      c.appendChild(btn);
+    }
+  });
+}
+
+// ── HELPERS ────────────────────────────────────────────────
+function updateSlider(el, valId) {
+  if (!el) return;
+  const v = parseInt(el.value);
+  const ve = document.getElementById(valId); if (ve) ve.textContent = v;
+  const pct = ((v-1)/4)*100;
+  const color = el.classList.contains('purple-thumb') ? 'var(--purple)' : el.classList.contains('teal-thumb') ? 'var(--teal)' : 'var(--accent)';
+  el.style.background = `linear-gradient(to right,${color} ${pct}%,${color} ${pct}%,var(--border) ${pct}%,var(--border) 100%)`;
+}
+
+function updateDayLabel(date) {
+  const el = document.getElementById('jour-label'); if (!el || !date) return;
+  const [y,m,d] = date.split('-');
+  el.textContent = `${d}/${m}/${y.slice(2)}`;
+}
+
+function updateSaveStatus(updatedAt) {
+  const st = document.getElementById('save-status');
+  const si = document.getElementById('save-info');
+  if (updatedAt) {
+    st.textContent = '✓ Sauvegardé'; st.className = 'save-status saved';
+    if (si) si.textContent = 'Sauvegardé à ' + new Date(updatedAt).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  } else {
+    st.textContent = 'Non sauvegardé'; st.className = 'save-status';
+    if (si) si.textContent = 'Données non sauvegardées';
+  }
+}
+
+function toggleSection(head) {
+  const body = head.nextElementSibling;
+  const chev = head.querySelector('.section-chevron');
+  body.classList.toggle('collapsed');
+  if (chev) chev.classList.toggle('open', !body.classList.contains('collapsed'));
+}
+
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type==='error'?' error':type==='success'?' success':'');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── PRÉ-COMP STAFF ─────────────────────────────────────────
+function fillPrecompStaffForm(d) {
+  [
+    ['groupe-forme-generale','groupe_forme_generale','groupe-forme-obs','groupe_forme_obs'],
+    ['groupe-motivation','groupe_motivation','groupe-motivation-obs','groupe_motivation_obs'],
+    ['groupe-cohesion','groupe_cohesion','groupe-cohesion-obs','groupe_cohesion_obs'],
+  ].forEach(([sid, sdb, oid, odb]) => {
+    const sl = document.getElementById(sid); if (!sl) return;
+    sl.value = d?.[sdb] || 3;
+    updateStaffSlider(sl, sid+'-val', 'var(--teal)');
+    const obs = document.getElementById(oid); if (obs) obs.value = d?.[odb] || '';
+  });
+  [['mat-tenues','mat_tenues'],['mat-equipement-comp','mat_equipement_comp'],['mat-equipement-analyse','mat_equipement_analyse'],['mat-medical','mat_medical']].forEach(([hid, dbk]) => {
+    const el = document.getElementById(hid); if (el) el.value = d?.[dbk] || 'Conforme';
+  });
+  [['mat-tenues-obs','mat_tenues_obs'],['mat-equipement-comp-obs','mat_equipement_comp_obs'],['mat-equipement-analyse-obs','mat_equipement_analyse_obs'],['mat-medical-obs','mat_medical_obs'],
+   ['log-observations','log_observations'],['ps-objectifs-groupe','objectifs_groupe'],['ps-scenarios-anticipes','scenarios_anticipes'],['ps-plans-contingence','plans_contingence'],
+   ['ps-composition-staff','composition_staff'],['ps-roles-responsabilites','roles_responsabilites'],['ps-points-attention-staff','points_attention_staff'],['ps-observations-generales','observations_generales']
+  ].forEach(([hid, dbk]) => { const el = document.getElementById(hid); if (el) el.value = d?.[dbk] || ''; });
+  updateSaveStatus(d?.updated_at);
+}
+
+async function savePrecompStaff() {
+  const g  = id => document.getElementById(id)?.value || '';
+  const gi = id => parseInt(document.getElementById(id)?.value || 3);
+  const gc = id => document.getElementById(id)?.checked || false;
+  const payload = {
+    competition_id: activeCompId, coach_id: activeCoachId, date_entree: currentDate,
+    groupe_forme_generale: gi('groupe-forme-generale'), groupe_forme_obs: g('groupe-forme-obs'),
+    groupe_motivation: gi('groupe-motivation'), groupe_motivation_obs: g('groupe-motivation-obs'),
+    groupe_cohesion: gi('groupe-cohesion'), groupe_cohesion_obs: g('groupe-cohesion-obs'),
+    mat_tenues: g('mat-tenues'), mat_tenues_obs: g('mat-tenues-obs'),
+    mat_equipement_comp: g('mat-equipement-comp'), mat_equipement_comp_obs: g('mat-equipement-comp-obs'),
+    mat_equipement_analyse: g('mat-equipement-analyse'), mat_equipement_analyse_obs: g('mat-equipement-analyse-obs'),
+    mat_medical: g('mat-medical'), mat_medical_obs: g('mat-medical-obs'),
+    objectifs_groupe: g('ps-objectifs-groupe'), scenarios_anticipes: g('ps-scenarios-anticipes'),
+    plans_contingence: g('ps-plans-contingence'), composition_staff: g('ps-composition-staff'),
+    roles_responsabilites: g('ps-roles-responsabilites'), points_attention_staff: g('ps-points-attention-staff'),
+    observations_generales: g('ps-observations-generales'),
+  };
+  let error;
+  if (existingPrecompStaffId) { ({error} = await sb.from('precomp_staff_entries').update(payload).eq('id', existingPrecompStaffId)); }
+  else { const {data,error:e} = await sb.from('precomp_staff_entries').insert(payload).select().single(); error=e; if(!e) existingPrecompStaffId=data.id; }
+  if (error) return toast('Erreur : '+error.message, 'error');
+  toast('✓ Sauvegardé','success'); updateSaveStatus(new Date().toISOString());
+}
+
+// ── POST-COMP STAFF ────────────────────────────────────────
+function renderStars(containerId, key, currentVal) {
+  const c = document.getElementById(containerId); if (!c) return;
+  c.innerHTML = '';
+  for (let n = 1; n <= 5; n++) {
+    const btn = document.createElement('button');
+    btn.className = 'star-btn'; btn.textContent = '★';
+    btn.classList.toggle('active', n <= (currentVal || 0));
+    btn.onclick = () => { postcompStaffStars[key] = n; c.querySelectorAll('.star-btn').forEach((b,i) => b.classList.toggle('active', i+1 <= n)); };
+    c.appendChild(btn);
+  }
+}
+
+async function loadPostcompPerformances() {
+  const { data } = await sb.from('results').select('*, events(epreuve, tour, temps_engagement, date_epreuve, athletes(prenom, nom))').eq('competition_id', activeCompId).eq('a_nage', true);
+  const container = document.getElementById('postcomp-staff-perf-table'); if (!container) return;
+  if (!data?.length) { container.innerHTML = '<div style="color:var(--hint);font-size:13px">Aucun résultat enregistré</div>'; return; }
+  const toSec = t => { if (!t) return null; const p = t.split(':'); return p.length===2 ? parseFloat(p[0])*60+parseFloat(p[1]) : parseFloat(t); };
+  const rows = data.map(r => {
+    const ref = r.events?.temps_engagement, temps = r.temps;
+    let ecart = '';
+    if (ref && temps) { const diff = toSec(temps) - toSec(ref); const sign = diff<0?'-':'+'; ecart = `<span style="color:${diff<0?'var(--success)':'var(--error)'}">${sign}${Math.abs(diff).toFixed(2)}</span>`; }
+    return `<tr>
+      <td><strong style="font-size:12px">${r.events?.athletes?.prenom} ${r.events?.athletes?.nom}</strong></td>
+      <td style="font-size:12px">${r.events?.epreuve}</td>
+      <td style="font-size:12px">${r.events?.tour}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px">${ref||'—'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600">${temps||'—'}</td>
+      <td style="text-align:center">${r.rang?`<strong>${r.rang}</strong>`:'—'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px">${ecart||'—'}</td>
+    </tr>`;
+  }).join('');
+  container.innerHTML = `<table class="result-table"><thead><tr><th>Nageur·se</th><th>Épreuve</th><th>Tour</th><th>Engagement</th><th>Temps</th><th>Rang</th><th>Écart</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function fillPostcompStaffForm(d) {
+  const toggleEl = document.getElementById('post-resultats-conformes');
+  if (toggleEl) toggleEl.checked = d?.resultats_conformes || false;
+  [['post-resultats-obs','resultats_obs'],['post-axes-sport','axes_sport'],['post-axes-compo','axes_comportement'],
+   ['enc-incidents','enc_incidents'],['enc-observations','enc_observations'],
+   ['dep-date-depart','dep_date_depart'],['dep-date-retour','dep_date_retour'],['dep-compagnie','dep_compagnie'],['dep-incidents','dep_incidents'],
+   ['heb-nom','heb_nom'],['heb-observations','heb_observations'],['resto-commentaires','resto_commentaires'],['site-commentaires','site_commentaires'],
+   ['pcs-problemes-admin','log_problemes_admin'],['pcs-points-forts','points_forts'],['pcs-points-ameliorer','points_ameliorer'],
+   ['pcs-recommandations-sport','recommandations_sport'],['pcs-recommandations-orga','recommandations_orga'],['pcs-conclusions-dtn','conclusions_dtn'],
+  ].forEach(([hid,dbk]) => { const el=document.getElementById(hid); if(el) el.value=d?.[dbk]||''; });
+  [['enc-reunion-equipe','enc_reunion_equipe'],['enc-briefing-staff','enc_briefing_staff'],['enc-briefing-nageurs','enc_briefing_nageurs'],
+   ['enc-protocoles-medicaux','enc_protocoles_medicaux'],['enc-retour-experience','enc_retour_experience'],
+  ].forEach(([hid,dbk]) => { const el=document.getElementById(hid); if(el) el.checked=d?.[dbk]||false; });
+  [['pcs-mat-tenues','log_mat_tenues'],['pcs-mat-equipement-comp','log_mat_equipement_comp'],['pcs-mat-equipement-analyse','log_mat_equipement_analyse'],['pcs-mat-medical','log_mat_medical']].forEach(([hid,dbk]) => {
+    const el=document.getElementById(hid); if(el) el.value=d?.[dbk]||'Conforme';
+  });
+  [['pcs-mat-tenues-obs','log_mat_tenues_obs'],['pcs-mat-equipement-comp-obs','log_mat_equipement_comp_obs'],['pcs-mat-equipement-analyse-obs','log_mat_equipement_analyse_obs'],['pcs-mat-medical-obs','log_mat_medical_obs']].forEach(([hid,dbk]) => {
+    const el=document.getElementById(hid); if(el) el.value=d?.[dbk]||'';
+  });
+  ['bilan-sportif','bilan-encadrement','bilan-logistique','bilan-deplacement','bilan-organisation'].forEach(name => {
+    const val = d?.[name.replace(/-/g,'_')];
+    if (val) document.querySelectorAll(`input[name="${name}"]`).forEach(r => { r.checked = (r.value===val); });
+  });
+  const starKeys = { 'pcs-enc-communication':'enc_communication','pcs-enc-cohesion':'enc_cohesion','pcs-enc-relation-orga':'enc_relation_orga','pcs-enc-gestion-imprevus':'enc_gestion_imprevus','pcs-dep-qualite-voyage':'dep_qualite_voyage','pcs-heb-qualite':'heb_qualite','pcs-heb-adequation':'heb_adequation','pcs-heb-proximite':'heb_proximite','pcs-resto-qualite':'resto_qualite','pcs-transport-local':'transport_local','pcs-site-qualite':'site_qualite','pcs-site-accueil':'site_accueil','pcs-note-globale':'note_globale' };
+  Object.entries(starKeys).forEach(([cid,key]) => { postcompStaffStars[key]=d?.[key]||null; renderStars(cid,key,postcompStaffStars[key]); });
+  updateSaveStatus(d?.updated_at);
+}
+
+async function savePostcompStaff() {
+  const g  = id => document.getElementById(id)?.value || '';
+  const gc = id => document.getElementById(id)?.checked || false;
+  const gr = name => document.querySelector(`input[name="${name}"]:checked`)?.value || null;
+  const payload = {
+    competition_id: activeCompId, coach_id: activeCoachId,
+    resultats_conformes: gc('post-resultats-conformes'), resultats_obs: g('post-resultats-obs'),
+    axes_sport: g('post-axes-sport'), axes_comportement: g('post-axes-compo'),
+    enc_communication: postcompStaffStars.enc_communication, enc_cohesion: postcompStaffStars.enc_cohesion,
+    enc_relation_orga: postcompStaffStars.enc_relation_orga, enc_gestion_imprevus: postcompStaffStars.enc_gestion_imprevus,
+    enc_reunion_equipe: gc('enc-reunion-equipe'), enc_briefing_staff: gc('enc-briefing-staff'),
+    enc_briefing_nageurs: gc('enc-briefing-nageurs'), enc_protocoles_medicaux: gc('enc-protocoles-medicaux'),
+    enc_retour_experience: gc('enc-retour-experience'), enc_incidents: g('enc-incidents'), enc_observations: g('enc-observations'),
+    log_mat_tenues: g('pcs-mat-tenues'), log_mat_tenues_obs: g('pcs-mat-tenues-obs'),
+    log_mat_equipement_comp: g('pcs-mat-equipement-comp'), log_mat_equipement_comp_obs: g('pcs-mat-equipement-comp-obs'),
+    log_mat_equipement_analyse: g('pcs-mat-equipement-analyse'), log_mat_equipement_analyse_obs: g('pcs-mat-equipement-analyse-obs'),
+    log_mat_medical: g('pcs-mat-medical'), log_mat_medical_obs: g('pcs-mat-medical-obs'),
+    log_problemes_admin: g('pcs-problemes-admin'),
+    dep_date_depart: g('dep-date-depart'), dep_date_retour: g('dep-date-retour'), dep_compagnie: g('dep-compagnie'),
+    dep_incidents: g('dep-incidents'), dep_qualite_voyage: postcompStaffStars.dep_qualite_voyage,
+    heb_nom: g('heb-nom'), heb_observations: g('heb-observations'),
+    heb_qualite: postcompStaffStars.heb_qualite, heb_adequation: postcompStaffStars.heb_adequation, heb_proximite: postcompStaffStars.heb_proximite,
+    resto_qualite: postcompStaffStars.resto_qualite, transport_local: postcompStaffStars.transport_local, resto_commentaires: g('resto-commentaires'),
+    site_qualite: postcompStaffStars.site_qualite, site_accueil: postcompStaffStars.site_accueil, site_commentaires: g('site-commentaires'),
+    bilan_sportif: gr('bilan-sportif'), bilan_encadrement: gr('bilan-encadrement'), bilan_logistique: gr('bilan-logistique'),
+    bilan_deplacement: gr('bilan-deplacement'), bilan_organisation: gr('bilan-organisation'),
+    note_globale: postcompStaffStars.note_globale,
+    points_forts: g('pcs-points-forts'), points_ameliorer: g('pcs-points-ameliorer'),
+    recommandations_sport: g('pcs-recommandations-sport'), recommandations_orga: g('pcs-recommandations-orga'),
+    conclusions_dtn: g('pcs-conclusions-dtn'),
+  };
+  let error;
+  if (existingPostcompStaffId) { ({error} = await sb.from('postcomp_staff_entries').update(payload).eq('id', existingPostcompStaffId)); }
+  else { const {data,error:e} = await sb.from('postcomp_staff_entries').insert(payload).select().single(); error=e; if(!e) existingPostcompStaffId=data.id; }
+  if (error) return toast('Erreur : '+error.message, 'error');
+  toast('✓ Bilan staff sauvegardé','success'); updateSaveStatus(new Date().toISOString());
+}
+
+// ── PDF EXPORT ──────────────────────────────────────────────
+function generateStaffPDF() {
+  // Set date
+  document.getElementById('pdf-date').textContent = 'Date: ' + new Date(currentDate).toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric'});
+
+  // Logistique items
+  const logItems = STAFF_ITEMS.logistique.map(item => {
+    const val = parseInt(document.getElementById(item.key)?.value || 3);
+    const obs = document.getElementById(item.key+'_obs')?.value || '';
+    return `<div style="margin-bottom:12px;padding:8px;background:#f9f9f9;border-radius:4px">
+      <div style="font-weight:500;font-size:12px">${item.label}</div>
+      <div style="font-size:11px;color:#666;margin:4px 0">Score: ${val}/5 — ${obs ? 'Obs: '+obs : 'Aucune observation'}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('pdf-logistique-items').innerHTML = logItems;
+
+  // Vie items
+  const vieItems = STAFF_ITEMS.vie.map(item => {
+    const val = parseInt(document.getElementById(item.key)?.value || 3);
+    const obs = document.getElementById(item.key+'_obs')?.value || '';
+    return `<div style="margin-bottom:12px;padding:8px;background:#f9f9f9;border-radius:4px">
+      <div style="font-weight:500;font-size:12px">${item.label}</div>
+      <div style="font-size:11px;color:#666;margin:4px 0">Score: ${val}/5 — ${obs ? 'Obs: '+obs : 'Aucune observation'}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('pdf-vie-items').innerHTML = vieItems;
+
+  // Posture (if comp phase)
+  let postureHTML = '';
+  if (currentPhase === 'comp') {
+    const posturMetrics = [
+      {id:'eval-commu', label:'Communication avec mes nageurs'},
+      {id:'eval-stress', label:'Gestion de mon stress et émotions'},
+      {id:'eval-concentration', label:'Concentration sur l\'essentiel'},
+      {id:'eval-expression', label:'Expression intentionnelle de mes émotions'},
+      {id:'eval-decisions', label:'Pertinence de mes décisions tactiques'},
+      {id:'eval-presence', label:'Présence et disponibilité'},
+    ];
+    postureHTML = posturMetrics.map(m => {
+      const val = parseInt(document.getElementById(m.id)?.value || 3);
+      return `<div style="margin-bottom:12px;padding:8px;background:#f9f9f9;border-radius:4px">
+        <div style="font-weight:500;font-size:12px">${m.label}</div>
+        <div style="font-size:11px;color:#666;margin:4px 0">Évaluation: ${val}/5</div>
+      </div>`;
+    }).join('');
+  } else {
+    postureHTML = '<p style="font-size:11px;color:#999">Non applicable en cette phase</p>';
+  }
+  document.getElementById('pdf-content-posture').style.display = currentPhase === 'comp' ? 'block' : 'none';
+  document.getElementById('pdf-posture-items').innerHTML = postureHTML;
+
+  // Observations générales
+  const obsGen = document.getElementById('staff-obs-generales')?.value || 'Aucune observation';
+  document.getElementById('pdf-obs-generales').textContent = obsGen;
+
+  // Generate PDF
+  const element = document.getElementById('staff-pdf-container');
+  const opt = {
+    margin: 10,
+    filename: `Bilan_Staff_${currentDate.replace(/-/g,'_')}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+  };
+  html2pdf().set(opt).from(element).save();
+  toast('PDF généré avec succès','success');
+}
+
+// ── INIT ───────────────────────────────────────────────────
+initSetup();
+</script>
+</body>
+</html>

@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FFN — Dashboard compétition</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --navy: #0A1628;
+    --blue: #1B4F8A;
+    --blue-light: #2563C4;
+    --accent: #E8632A;
+    --accent2: #F0A500;
+    --surface: #ffffff;
+    --surface2: #F4F6FA;
+    --surface3: #EBF0F8;
+    --border: #DDE3EE;
+    --text: #0A1628;
+    --muted: #5A6478;
+    --hint: #9AA3B5;
+    --success: #1A7A4A;
+    --error: #C0392B;
+    --r: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--surface2); color: var(--text); }
+
+  /* HEADER */
+  .header {
+    background: var(--navy); padding: 0 1.5rem;
+    display: flex; align-items: center; justify-content: space-between; height: 52px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-brand { display: flex; align-items: center; gap: 10px; }
+  .header-logo { width: 28px; height: 28px; background: var(--accent); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; }
+  .header-title { color: #fff; font-size: 14px; font-weight: 500; }
+  .comp-select-header { display: flex; align-items: center; gap: 8px; }
+  .comp-select-header label { color: rgba(255,255,255,0.5); font-size: 12px; }
+  .comp-select-header select { font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: #fff; outline: none; font-family: 'DM Sans', sans-serif; }
+  .comp-select-header select option { background: var(--navy); }
+
+  /* FILTERS */
+  .filters { display: flex; gap: 8px; align-items: center; padding: 1rem 1.5rem; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .filter-label { font-size: 12px; color: var(--muted); font-weight: 500; margin-right: 4px; }
+  .filter-btn { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); cursor: pointer; transition: all 0.12s; font-family: 'DM Sans', sans-serif; }
+  .filter-btn:hover { border-color: var(--blue-light); color: var(--blue-light); }
+  .filter-btn.active { background: var(--blue-light); color: #fff; border-color: var(--blue-light); }
+  .filter-sep { width: 1px; height: 20px; background: var(--border); }
+
+  /* MAIN LAYOUT */
+  .main { padding: 1.25rem 1.5rem; max-width: 1200px; margin: 0 auto; }
+
+  /* KPI ROW */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.25rem; }
+  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; }
+  .kpi-label { font-size: 11px; color: var(--hint); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .kpi-value { font-size: 28px; font-weight: 600; color: var(--navy); font-family: 'DM Mono', monospace; line-height: 1; }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .kpi-card.accent .kpi-value { color: var(--accent); }
+  .kpi-card.blue .kpi-value { color: var(--blue-light); }
+  .kpi-card.green .kpi-value { color: var(--success); }
+
+  /* GRID 2 COL */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+
+  /* CARDS */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+  .card-head { padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface2); display: flex; align-items: center; justify-content: space-between; }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--navy); }
+  .card-sub { font-size: 11px; color: var(--hint); }
+  .card-body { padding: 14px; }
+
+  /* TABLES */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .data-table th { text-align: left; font-size: 10px; font-weight: 600; color: var(--hint); letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--surface2); white-space: nowrap; }
+  .data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--surface2); }
+
+  /* BADGES */
+  .badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+  .badge-blue { background: #EBF3FF; color: var(--blue-light); }
+  .badge-green { background: #E6F6ED; color: var(--success); }
+  .badge-orange { background: #FFF3E8; color: var(--accent); }
+  .badge-gray { background: var(--surface3); color: var(--muted); }
+  .badge-red { background: #FFF0F0; color: var(--error); }
+
+  /* SCORE PILLS */
+  .score-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 3px; }
+  .score-bar { display: flex; gap: 2px; align-items: center; }
+  .score-pip { width: 10px; height: 10px; border-radius: 2px; background: var(--border); }
+  .score-pip.filled { background: var(--accent); }
+  .score-pip.filled-blue { background: var(--blue-light); }
+
+  /* COACH CARD */
+  .coach-entry { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .coach-entry:last-child { border-bottom: none; }
+  .coach-entry-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .coach-name { font-size: 13px; font-weight: 500; color: var(--navy); }
+  .coach-meta { font-size: 11px; color: var(--muted); }
+  .coach-scores { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .coach-score-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); }
+
+  /* ATHLETE ROW */
+  .athlete-result { display: grid; grid-template-columns: 130px 120px 60px 60px 1fr; gap: 8px; align-items: center; padding: 7px 10px; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .athlete-result:last-child { border-bottom: none; }
+  .athlete-result:hover { background: var(--surface2); }
+
+  /* NATION OBS */
+  .nation-entry { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .nation-entry:last-child { border-bottom: none; }
+  .nation-tag { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 4px; background: var(--surface3); font-size: 11px; font-family: 'DM Mono', monospace; color: var(--muted); margin-right: 6px; }
+
+  /* EMPTY */
+  .empty { text-align: center; padding: 2rem; color: var(--hint); font-size: 13px; }
+
+  /* LOADING */
+  .loading { display: flex; align-items: center; justify-content: center; padding: 3rem; color: var(--hint); font-size: 13px; gap: 8px; }
+
+  /* TABS */
+  .tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--surface); padding: 0 1.5rem; }
+  .tab-btn { padding: 10px 16px; font-size: 13px; font-weight: 500; color: var(--muted); border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.12s; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--blue-light); border-bottom-color: var(--blue-light); }
+
+  /* SUBTABS */
+  .subtab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--surface); margin-bottom: 1rem; border-radius: var(--r) var(--r) 0 0; }
+  .subtab-btn { padding: 8px 14px; font-size: 12px; font-weight: 500; color: var(--muted); border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.12s; font-family: 'DM Sans', sans-serif; }
+  .subtab-btn:hover { color: var(--text); }
+  .subtab-btn.active { color: var(--teal); border-bottom-color: var(--teal); }
+
+  /* FORM FACTOR */
+  .mot-card { background: var(--surface2); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 10px 12px; margin-bottom: 8px; font-style: italic; font-size: 13px; color: var(--navy); }
+  .mot-author { font-style: normal; font-size: 11px; color: var(--hint); margin-top: 4px; }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    .kpi-row { grid-template-columns: 1fr 1fr; }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-brand">
+    <div class="header-logo">FFN</div>
+    <div class="header-title">Dashboard — Staff technique</div>
+  </div>
+  <div class="comp-select-header">
+    <label>Compétition :</label>
+    <select id="header-comp-select" onchange="onCompChange()"><option value="">— Choisir —</option></select>
+  </div>
+  <div style="display:flex;gap:12px">
+    <button onclick="exportDashboardPDF()" style="background:none;border:none;color:rgba(255,255,255,0.8);cursor:pointer;font-size:13px;font-weight:500;padding:8px 12px;border-radius:4px;transition:all.2s;display:flex;align-items:center;gap:6px" onmouseover="this.style.background='rgba(255,255,255,0.15)'" onmouseout="this.style.background='none'">
+      📥 PDF
+    </button>
+  </div>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="showTab('synthese')">Synthèse</button>
+  <button class="tab-btn" onclick="showTab('resultats')">Résultats</button>
+  <button class="tab-btn" onclick="showTab('entraineurs')">Entraîneurs</button>
+  <button class="tab-btn" onclick="showTab('nations')">Nations observées</button>
+  <button class="tab-btn" onclick="showTab('mots')">Mots du jour</button>
+  <button class="tab-btn" onclick="showTab('staff')" style="color:var(--teal)">★ Staff</button>
+  <button class="tab-btn" onclick="showTab('rapport')" style="color:var(--accent)">📋 Rapport Final</button>
+</div>
+
+<div id="no-comp" style="padding:3rem;text-align:center;color:var(--hint);font-size:13px">
+  Sélectionner une compétition pour afficher le tableau de bord.
+</div>
+
+<div id="dash-content" style="display:none">
+
+  <!-- FILTERS -->
+  <div class="filters">
+    <span class="filter-label">Filtre jour :</span>
+    <button class="filter-btn active" onclick="filterByDate('all', this)">Tous les jours</button>
+    <div id="date-filters"></div>
+    <div class="filter-sep"></div>
+    <span class="filter-label">Entraîneur :</span>
+    <button class="filter-btn active" onclick="filterByCoach('all', this)">Tous</button>
+    <div id="coach-filters"></div>
+  </div>
+
+  <div class="main" id="tab-synthese">
+
+    <!-- KPIs -->
+    <div class="kpi-row" id="kpi-row">
+      <div class="kpi-card blue"><div class="kpi-label">Entraîneurs actifs</div><div class="kpi-value" id="kpi-coaches">—</div><div class="kpi-sub">avec journaux</div></div>
+      <div class="kpi-card"><div class="kpi-label">Nageurs suivis</div><div class="kpi-value" id="kpi-athletes">—</div><div class="kpi-sub">résultats saisis</div></div>
+      <div class="kpi-card accent"><div class="kpi-label">Épreuves du jour</div><div class="kpi-value" id="kpi-events">—</div><div class="kpi-sub">programmées</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Taux de saisie</div><div class="kpi-value" id="kpi-fill">—</div><div class="kpi-sub">journaux / jours</div></div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Résumé entraîneurs du jour -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">État des entraîneurs</div>
+          <div class="card-sub" id="etat-date">Aujourd'hui</div>
+        </div>
+        <div id="coaches-etat-list"><div class="loading">Chargement…</div></div>
+      </div>
+
+      <!-- Top observations nations -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Nations les plus observées</div>
+          <div class="card-sub">
+            <button onclick="showTab('nations')" style="background:none;border:none;color:var(--blue-light);cursor:pointer;font-size:11px;padding:0">Voir le détail →</button>
+          </div>
+        </div>
+        <div id="nations-summary"><div class="loading">Chargement…</div></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Résultats du jour -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Résultats récents</div>
+        </div>
+        <div id="results-recent"><div class="loading">…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main" id="tab-resultats" style="display:none">
+
+    <!-- KPIs statistiques -->
+    <div class="kpi-row" id="results-kpi-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi-card blue">
+        <div class="kpi-label">Demi-finales</div>
+        <div class="kpi-value" id="stat-df-pct">—</div>
+        <div class="kpi-sub" id="stat-df-detail">— nageurs qualifiés</div>
+      </div>
+      <div class="kpi-card accent">
+        <div class="kpi-label">Finales</div>
+        <div class="kpi-value" id="stat-fin-pct">—</div>
+        <div class="kpi-sub" id="stat-fin-detail">— nageurs en finale</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">Podiums</div>
+        <div class="kpi-value" id="stat-pod-pct">—</div>
+        <div class="kpi-sub" id="stat-pod-detail">— podiums</div>
+      </div>
+      <div class="kpi-card" style="border-left:3px solid var(--accent2)">
+        <div class="kpi-label">Temps d'engagement battus</div>
+        <div class="kpi-value" id="stat-eng-pct" style="color:var(--accent2)">—</div>
+        <div class="kpi-sub" id="stat-eng-detail">sur — épreuves chronométrées</div>
+      </div>
+    </div>
+
+    <!-- Vue par épreuve -->
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-head">
+        <div class="card-title">Résultats par épreuve</div>
+        <div class="card-sub" id="results-count-label">—</div>
+      </div>
+      <div id="results-by-epreuve"></div>
+    </div>
+
+    <!-- Table complète -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Tableau complet</div>
+        <button class="filter-btn" onclick="toggleResultsTable()" id="results-table-toggle" style="font-size:11px">Afficher ▾</button>
+      </div>
+      <div id="results-table-wrap" style="display:none">
+        <table class="data-table">
+          <thead><tr><th>Nageur</th><th>Épreuve</th><th>Tour</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Réf.</th><th>Rang</th><th>Entraîneur</th><th>Observations</th></tr></thead>
+          <tbody id="results-full-list"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="main" id="tab-entraineurs" style="display:none">
+    <div id="coaches-detail-list"></div>
+  </div>
+
+  <div class="main" id="tab-nations" style="display:none">
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-head">
+        <div class="card-title">Thèmes d'apprentissage</div>
+        <div class="card-sub">toutes entrées entraîneurs</div>
+      </div>
+      <div class="card-body" id="themes-summary"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-title">Observations par nation</div></div>
+      <div id="nations-full-list"></div>
+    </div>
+  </div>
+
+  <div class="main" id="tab-mots" style="display:none">
+    <div class="card">
+      <div class="card-head"><div class="card-title">Mots du jour — tous les entraîneurs</div></div>
+      <div class="card-body" id="mots-list"></div>
+    </div>
+  </div>
+
+  <div class="main" id="tab-staff" style="display:none">
+    <div style="font-size:11px;color:var(--hint);padding:4px 0 12px;display:flex;align-items:center;gap:6px">
+      <span style="background:#E0F3F2;color:var(--teal);padding:2px 8px;border-radius:4px;font-weight:500">STAFF</span>
+      Vue réservée au staff technique FFN
+    </div>
+    <div class="card" style="margin-bottom:1rem">
+      <div class="subtab-bar">
+        <button class="subtab-btn active" onclick="showStaffSubTab('comp')">Compétition</button>
+        <button class="subtab-btn" onclick="showStaffSubTab('precomp')">Pré-compétition</button>
+        <button class="subtab-btn" onclick="showStaffSubTab('postcomp')">Bilan post-comp</button>
+      </div>
+      <div id="staff-subtab-comp" style="padding:0"></div>
+      <div id="staff-subtab-precomp" style="padding:0;display:none"></div>
+      <div id="staff-subtab-postcomp" style="padding:0;display:none"></div>
+    </div>
+  </div>
+
+  <!-- RAPPORT FINAL TAB -->
+  <div class="main" id="tab-rapport" style="display:none">
+    <div id="rapport-content"></div>
+  </div>
+
+</div>
+
+<script>
+const SUPABASE_URL = 'https://bpdxdljctybdmtemubjh.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwZHhkbGpjdHliZG10ZW11YmpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NzA2MTgsImV4cCI6MjA5NTU0NjYxOH0.b5GKWWTWTsrYPGmVPvexLWqAiQvkMl43Pzo96mz6lQw';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let activeCompId = null;
+let allJournals = [], allResults = [], allNationObs = [], allEvents = [];
+let allStaffEntries = [], allPrecompStaff = [], allPostcompStaff = [];
+let filterDate = 'all', filterCoach = 'all';
+let currentTab = 'synthese', currentStaffSubTab = 'comp';
+
+// ── INIT ─────────────────────────────────────────────────
+async function init() {
+  const { data } = await sb.from('competitions').select('*').order('date_debut', { ascending: false });
+  const sel = document.getElementById('header-comp-select');
+  (data || []).forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.nom; sel.appendChild(o); });
+  if (data && data.length) { sel.value = data[0].id; onCompChange(); }
+}
+
+async function onCompChange() {
+  activeCompId = document.getElementById('header-comp-select').value;
+  document.getElementById('no-comp').style.display = activeCompId ? 'none' : '';
+  document.getElementById('dash-content').style.display = activeCompId ? '' : 'none';
+  if (!activeCompId) return;
+  await loadAllData();
+  renderDashboard();
+}
+
+async function loadAllData() {
+  const [j, r, n, e, se, ps, pcs] = await Promise.all([
+    sb.from('journal_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree'),
+    sb.from('results').select('*, events(*, athletes(*)), coaches(*)').eq('competition_id', activeCompId),
+    sb.from('nation_observations').select('*, nations(*), coaches(*)').eq('competition_id', activeCompId),
+    sb.from('events').select('*, athletes(*)').eq('competition_id', activeCompId).order('date_epreuve').order('heure'),
+    sb.from('staff_entries').select('*').eq('competition_id', activeCompId).order('date_entree'),
+    sb.from('precomp_staff_entries').select('*').eq('competition_id', activeCompId).order('date_entree'),
+    sb.from('postcomp_staff_entries').select('*').eq('competition_id', activeCompId),
+  ]);
+  allJournals = j.data || [];
+  allResults = r.data || [];
+  allNationObs = n.data || [];
+  allEvents = e.data || [];
+  allStaffEntries = se.data || [];
+  allPrecompStaff = ps.data || [];
+  allPostcompStaff = pcs.data || [];
+  buildFilters();
+}
+
+function buildFilters() {
+  // Dates
+  const dates = [...new Set(allJournals.map(j => j.date_entree))].sort();
+  const df = document.getElementById('date-filters');
+  df.innerHTML = dates.map(d => `<button class="filter-btn" onclick="filterByDate('${d}', this)">${fmtDate(d)}</button>`).join('');
+
+  // Coaches
+  const coaches = [...new Map(allJournals.map(j => [j.coach_id, j.coaches])).entries()];
+  const cf = document.getElementById('coach-filters');
+  cf.innerHTML = coaches.map(([id, c]) => `<button class="filter-btn" onclick="filterByCoach('${id}', this)">${c.prenom} ${c.nom}</button>`).join('');
+}
+
+function filterByDate(date, btn) {
+  filterDate = date;
+  document.querySelectorAll('.filters .filter-btn').forEach(b => {
+    if (b.closest('#date-filters') || b.textContent === 'Tous les jours') b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  renderDashboard();
+}
+
+function filterByCoach(id, btn) {
+  filterCoach = id;
+  document.querySelectorAll('.filters .filter-btn').forEach(b => {
+    if (b.closest('#coach-filters') || b.textContent === 'Tous') b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  renderDashboard();
+}
+
+function getFiltered() {
+  let journals = allJournals;
+  let results = allResults;
+  let nationObs = allNationObs;
+  if (filterDate !== 'all') {
+    journals = journals.filter(j => j.date_entree === filterDate);
+    results = results.filter(r => r.events?.date_epreuve === filterDate);
+    nationObs = nationObs.filter(n => n.date_obs === filterDate);
+  }
+  if (filterCoach !== 'all') {
+    journals = journals.filter(j => j.coach_id === filterCoach);
+    results = results.filter(r => r.coach_id === filterCoach);
+    nationObs = nationObs.filter(n => n.coach_id === filterCoach);
+  }
+  return { journals, results, nationObs };
+}
+
+// ── CALCUL DES STATISTIQUES DE RÉSULTATS ──────────────────
+function computeResultStats(results, events) {
+  // --- DF ---
+  const epreuves = [...new Set(events.map(e => e.epreuve))];
+  let totalDFNum = 0, totalDFDen = 0;
+
+  epreuves.forEach(epreuve => {
+    const engages = new Set(events.filter(e => e.epreuve === epreuve).map(e => e.athlete_id));
+    const nbEngages = engages.size;
+    if (!nbEngages) return;
+
+    const dfNages = new Set(
+      results.filter(r => r.events?.epreuve === epreuve && r.events?.tour === 'demi-finale' && r.a_nage)
+             .map(r => r.events?.athlete_id)
+    );
+
+    totalDFNum += dfNages.size;
+    totalDFDen += Math.min(nbEngages, 2);
+  });
+
+  const pctDF = totalDFDen > 0 ? Math.round(totalDFNum / totalDFDen * 100) : null;
+
+  // --- Finale ---
+  const enDF = new Set(
+    results.filter(r => r.events?.tour === 'demi-finale' && r.a_nage).map(r => r.events?.athlete_id)
+  );
+  const enFinale = new Set(
+    results.filter(r => r.events?.tour === 'finale' && r.a_nage).map(r => r.events?.athlete_id)
+  );
+  const denFinale = enDF.size > 0 ? enDF.size : new Set(events.map(e => e.athlete_id)).size;
+  const pctFinale = denFinale > 0 ? Math.round(enFinale.size / denFinale * 100) : null;
+
+  // --- Podium ---
+  const podiums = results.filter(r => r.events?.tour === 'finale' && r.a_nage && r.rang && r.rang <= 3).length;
+  const denPodium = enFinale.size;
+  const pctPodium = denPodium > 0 ? Math.round(podiums / denPodium * 100) : null;
+
+  // --- Temps d'engagement battus ---
+  const avecEngagement = results.filter(r => r.a_nage && r.events?.temps_engagement && r.temps);
+  const engagementBattus = avecEngagement.filter(r => compareTemps(r.temps, r.events.temps_engagement) < 0).length;
+  const pctEngagement = avecEngagement.length > 0 ? Math.round(engagementBattus / avecEngagement.length * 100) : null;
+
+  return {
+    nbDF: totalDFNum, pctDF,
+    nbFinale: enFinale.size, pctFinale,
+    nbPodium: podiums, pctPodium,
+    engagementBattus, totalAvecEngagement: avecEngagement.length, pctEngagement
+  };
+}
+
+// Compare deux temps au format "1:02.34" ou "58.42" ou "1:02:34.56"
+function compareTemps(a, b) {
+  const toSeconds = s => {
+    if (!s) return Infinity;
+    const parts = s.split(':').map(parseFloat);
+    if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
+    if (parts.length === 2) return parts[0]*60 + parts[1];
+    return parts[0];
+  };
+  return toSeconds(a) - toSeconds(b);
+}
+
+// ── RENDER ────────────────────────────────────────────────
+function renderDashboard() {
+  if (currentTab === 'synthese') renderSynthese();
+  else if (currentTab === 'resultats') renderResultats();
+  else if (currentTab === 'entraineurs') renderEntraineurs();
+  else if (currentTab === 'nations') renderNations();
+  else if (currentTab === 'mots') renderMots();
+  else if (currentTab === 'staff') renderStaffSubTab();
+}
+
+function renderSynthese() {
+  const { journals, results, nationObs } = getFiltered();
+
+  // KPIs
+  const uniqueCoaches = new Set(journals.map(j => j.coach_id)).size;
+  const uniqueAthletes = new Set(results.filter(r => r.a_nage).map(r => r.events?.athlete_id)).size;
+  const todayEvents = filterDate !== 'all' ? allEvents.filter(e => e.date_epreuve === filterDate).length : allEvents.length;
+  const days = new Set(allJournals.map(j => j.date_entree + j.coach_id)).size;
+  const total = new Set(allEvents.map(e => e.date_epreuve)).size * new Set(allJournals.map(j => j.coach_id)).size;
+
+  document.getElementById('kpi-coaches').textContent = uniqueCoaches || '—';
+  document.getElementById('kpi-athletes').textContent = uniqueAthletes || '—';
+  document.getElementById('kpi-events').textContent = todayEvents || '—';
+  document.getElementById('kpi-fill').textContent = total ? Math.round(days / total * 100) + '%' : '—';
+
+  // État entraîneurs
+  const coachesList = document.getElementById('coaches-etat-list');
+  if (!journals.length) { coachesList.innerHTML = '<div class="empty">Aucune entrée</div>'; }
+  else {
+    coachesList.innerHTML = journals.map(j => `
+      <div class="coach-entry">
+        <div class="coach-entry-head">
+          <div>
+            <div class="coach-name">${j.coaches.prenom} ${j.coaches.nom}</div>
+            <div class="coach-meta">${fmtDate(j.date_entree)} ${j.etat_groupe ? '· ' + j.etat_groupe : ''}</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            ${j.forme_physique ? `<span class="badge badge-gray">Phys. ${j.forme_physique}/5</span>` : ''}
+            ${j.forme_psychologique ? `<span class="badge badge-blue">Psy. ${j.forme_psychologique}/5</span>` : ''}
+          </div>
+        </div>
+        ${j.eval_communication ? `
+        <div class="coach-scores">
+          <div class="coach-score-item">Comm. ${j.eval_communication}/5 ${renderProgressBar(j.eval_communication, 'var(--blue)')}</div>
+          <div class="coach-score-item">Stress ${j.eval_stress}/5 ${renderProgressBar(j.eval_stress, 'var(--purple)')}</div>
+          <div class="coach-score-item">Décisions ${j.eval_decisions}/5 ${renderProgressBar(j.eval_decisions, 'var(--accent)')}</div>
+          <div class="coach-score-item">Présence ${j.eval_presence}/5 ${renderProgressBar(j.eval_presence, 'var(--teal)')}</div>
+        </div>` : ''}
+      </div>`).join('');
+  }
+
+  // Nations
+  const nationCounts = {};
+  allNationObs.forEach(n => { if(n.nations) { const k = n.nations.nom; nationCounts[k] = (nationCounts[k]||0) + 1; } });
+  const topNations = Object.entries(nationCounts).sort((a,b) => b[1]-a[1]).slice(0, 8);
+  const nationsSumEl = document.getElementById('nations-summary');
+  if (!topNations.length) { nationsSumEl.innerHTML = '<div class="empty">Aucune observation</div>'; }
+  else {
+    const max = topNations[0][1];
+    nationsSumEl.innerHTML = '<div style="padding:12px;display:flex;flex-direction:column;gap:6px">' +
+      topNations.map(([nom, count]) => `
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-size:12px;color:var(--text);min-width:140px">${nom}</div>
+          <div style="flex:1;background:var(--surface2);border-radius:3px;height:6px;overflow:hidden">
+            <div style="width:${count/max*100}%;height:100%;background:var(--blue-light);border-radius:3px"></div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);min-width:20px;text-align:right">${count}</div>
+        </div>`).join('') + '</div>';
+  }
+
+  // Résultats récents
+  const recent = results.filter(r => r.a_nage && r.temps).slice(0, 8);
+  const resultsEl = document.getElementById('results-recent');
+  if (!recent.length) { resultsEl.innerHTML = '<div class="empty">Aucun résultat saisi</div>'; }
+  else {
+    resultsEl.innerHTML = '<table class="data-table"><thead><tr><th>Nageur</th><th>Épreuve</th><th>Tour</th><th>Temps</th><th>Rang</th></tr></thead><tbody>' +
+      recent.map(r => `<tr>
+        <td>${r.events?.athletes?.prenom} ${r.events?.athletes?.nom}</td>
+        <td style="font-size:11px">${r.events?.epreuve}</td>
+        <td>${badgeTour(r.events?.tour)}</td>
+        <td style="font-family:'DM Mono',monospace;font-weight:500">${r.temps}</td>
+        <td>${r.rang ? `<span class="badge ${r.rang <= 3 ? 'badge-green' : 'badge-gray'}">${r.rang}e</span>` : '—'}</td>
+      </tr>`).join('') + '</tbody></table>';
+  }
+
+}
+
+function renderResultats() {
+  const { results } = getFiltered();
+  document.getElementById('results-count-label').textContent = results.length + ' résultat(s)';
+
+  // ── KPIs stats ──────────────────────────────────────────
+  const stats = computeResultStats(results, allEvents);
+  const fmtPct = (pct) => pct !== null ? pct + '%' : '—';
+  document.getElementById('stat-df-pct').textContent    = fmtPct(stats.pctDF);
+  document.getElementById('stat-df-detail').textContent = `${stats.nbDF} nageur(s) qualifié(s)`;
+  document.getElementById('stat-fin-pct').textContent   = fmtPct(stats.pctFinale);
+  document.getElementById('stat-fin-detail').textContent = `${stats.nbFinale} nageur(s) en finale`;
+  document.getElementById('stat-pod-pct').textContent   = fmtPct(stats.pctPodium);
+  document.getElementById('stat-pod-detail').textContent = `${stats.nbPodium} podium(s)`;
+  document.getElementById('stat-eng-pct').textContent   = fmtPct(stats.pctEngagement);
+  document.getElementById('stat-eng-detail').textContent =
+    `${stats.engagementBattus} sur ${stats.totalAvecEngagement} épreuves chronométrées`;
+
+  // ── Vue par épreuve ──────────────────────────────────────
+  const byEpreuve = {};
+  results.forEach(r => {
+    const nom = r.events?.epreuve;
+    if (!nom) return;
+    if (!byEpreuve[nom]) byEpreuve[nom] = [];
+    byEpreuve[nom].push(r);
+  });
+
+  const epreuveOrder = ['serie','demi-finale','finale'];
+  const epreuveEl = document.getElementById('results-by-epreuve');
+
+  if (!Object.keys(byEpreuve).length) {
+    epreuveEl.innerHTML = '<div class="empty">Aucun résultat</div>';
+  } else {
+    epreuveEl.innerHTML = Object.entries(byEpreuve).map(([epreuve, rows]) => {
+      rows.sort((a, b) => {
+        const ti = epreuveOrder.indexOf(a.events?.tour) - epreuveOrder.indexOf(b.events?.tour);
+        if (ti !== 0) return ti;
+        return (a.rang || 999) - (b.rang || 999);
+      });
+
+      const rowsHtml = rows.map(r => {
+        const engBattu = r.a_nage && r.events?.temps_engagement && r.temps &&
+                         compareTemps(r.temps, r.events.temps_engagement) < 0;
+        const podium = r.a_nage && r.rang && r.rang <= 3;
+        return `<tr>
+          <td><strong style="font-size:12px">${r.events?.athletes?.prenom} ${r.events?.athletes?.nom}</strong></td>
+          <td>${badgeTour(r.events?.tour)}</td>
+          <td style="font-family:'DM Mono',monospace;font-size:11px">${fmtDate(r.events?.date_epreuve)}</td>
+          <td>${r.a_nage ? '<span class="badge badge-green">✓ Nagé</span>' : '<span class="badge badge-red">✕ DNS</span>'}</td>
+          <td style="font-family:'DM Mono',monospace;font-weight:500">
+            ${r.temps || '—'}
+            ${engBattu ? '<span style="color:var(--success);font-size:10px;margin-left:4px">↓ Réf.</span>' : ''}
+          </td>
+          <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.temps_engagement || '—'}</td>
+          <td>${r.rang ? `<span class="badge ${podium ? 'badge-green' : r.rang <= 8 ? 'badge-orange' : 'badge-gray'}">${podium ? '🏅 ' : ''}${r.rang}</span>` : '—'}</td>
+          <td style="font-size:11px;color:var(--muted)">${r.coaches?.prenom} ${r.coaches?.nom}</td>
+          <td style="font-size:11px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.observations || '—'}</td>
+        </tr>`;
+      }).join('');
+
+      return `
+        <div style="border-bottom:2px solid var(--surface2)">
+          <div style="padding:8px 14px;background:var(--surface2);font-size:12px;font-weight:600;color:var(--navy);display:flex;align-items:center;gap:8px">
+            <span>${epreuve}</span>
+            <span class="badge badge-gray">${rows.filter(r=>r.a_nage).length} nagé(s)</span>
+            ${rows.filter(r=>r.a_nage&&r.rang&&r.rang<=3).length ? `<span class="badge badge-green">🏅 ${rows.filter(r=>r.a_nage&&r.rang&&r.rang<=3).length} podium(s)</span>` : ''}
+          </div>
+          <table class="data-table">
+            <thead><tr><th>Nageur</th><th>Tour</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Réf.</th><th>Rang</th><th>Entraîneur</th><th>Observations</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Table complète ───────────────────────────────────────
+  const tbody = document.getElementById('results-full-list');
+  if (!results.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="empty">Aucun résultat</td></tr>';
+  } else {
+    tbody.innerHTML = results.map(r => {
+      const engBattu = r.a_nage && r.events?.temps_engagement && r.temps &&
+                       compareTemps(r.temps, r.events.temps_engagement) < 0;
+      return `<tr>
+        <td><strong style="font-size:12px">${r.events?.athletes?.prenom} ${r.events?.athletes?.nom}</strong></td>
+        <td style="font-size:11px">${r.events?.epreuve}</td>
+        <td>${badgeTour(r.events?.tour)}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:11px">${fmtDate(r.events?.date_epreuve)}</td>
+        <td>${r.a_nage ? '<span class="badge badge-green">✓</span>' : '<span class="badge badge-red">✕</span>'}</td>
+        <td style="font-family:'DM Mono',monospace;font-weight:500">${r.temps || '—'}${engBattu ? ' <span style="color:var(--success);font-size:10px">↓</span>' : ''}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.temps_engagement || '—'}</td>
+        <td>${r.rang ? `<span class="badge ${r.rang<=3?'badge-green':r.rang<=8?'badge-orange':'badge-gray'}">${r.rang}</span>` : '—'}</td>
+        <td style="font-size:11px;color:var(--muted)">${r.coaches?.prenom} ${r.coaches?.nom}</td>
+        <td style="font-size:11px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.observations || '—'}</td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+function toggleResultsTable() {
+  const wrap = document.getElementById('results-table-wrap');
+  const btn  = document.getElementById('results-table-toggle');
+  const visible = wrap.style.display !== 'none';
+  wrap.style.display = visible ? 'none' : '';
+  btn.textContent = visible ? 'Afficher ▾' : 'Masquer ▴';
+}
+
+function renderEntraineurs() {
+  const { journals } = getFiltered();
+  const byCoach = {};
+  journals.forEach(j => {
+    const k = j.coach_id;
+    if (!byCoach[k]) byCoach[k] = { coach: j.coaches, entries: [] };
+    byCoach[k].entries.push(j);
+  });
+  const container = document.getElementById('coaches-detail-list');
+  if (!Object.keys(byCoach).length) { container.innerHTML = '<div class="card"><div class="empty">Aucune entrée</div></div>'; return; }
+  container.innerHTML = Object.values(byCoach).map(({ coach, entries }) => `
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-head">
+        <div class="card-title">${coach.prenom} ${coach.nom}</div>
+        <div class="card-sub">${entries.length} jour(s) saisi(s)</div>
+      </div>
+      ${entries.map(j => `
+        <div class="coach-entry">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <strong style="font-size:12px">${fmtDate(j.date_entree)}</strong>
+            <div style="display:flex;gap:4px">
+              ${j.etat_groupe ? `<span class="badge badge-gray">${j.etat_groupe}</span>` : ''}
+              ${j.forme_physique ? `<span class="badge badge-gray">P:${j.forme_physique}</span>` : ''}
+              ${j.forme_psychologique ? `<span class="badge badge-blue">Ps:${j.forme_psychologique}</span>` : ''}
+            </div>
+          </div>
+          ${j.apprentissages ? `<div style="font-size:12px;color:var(--muted);margin-bottom:4px"><strong style="color:var(--navy)">Apprentissages :</strong> ${j.apprentissages}</div>` : ''}
+          ${j.mot_du_jour ? `<div style="font-style:italic;font-size:12px;color:var(--navy);border-left:2px solid var(--accent);padding-left:8px;margin-top:4px">"${j.mot_du_jour}"</div>` : ''}
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+function renderNations() {
+  const { nationObs } = getFiltered();
+
+  // Thèmes d'apprentissage
+  const { journals } = getFiltered();
+  const themeCounts = {};
+  journals.forEach(j => (j.themes||[]).forEach(t => { themeCounts[t] = (themeCounts[t]||0) + 1; }));
+  const topThemes = Object.entries(themeCounts).sort((a,b) => b[1]-a[1]);
+  const themesEl = document.getElementById('themes-summary');
+  if (themesEl) {
+    if (!topThemes.length) { themesEl.innerHTML = '<div class="empty">Aucun thème</div>'; }
+    else {
+      const maxT = topThemes[0][1];
+      themesEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:6px">' +
+        topThemes.map(([t, c]) => `
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="font-size:12px;color:var(--text);flex:1">${t}</div>
+            <div style="width:80px;background:var(--surface2);border-radius:3px;height:6px;overflow:hidden">
+              <div style="width:${c/maxT*100}%;height:100%;background:var(--accent);border-radius:3px"></div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);min-width:16px;text-align:right">${c}</div>
+          </div>`).join('') + '</div>';
+    }
+  }
+
+  const byNation = {};
+  nationObs.forEach(n => {
+    const k = n.nation_id;
+    if (!byNation[k]) byNation[k] = { nation: n.nations, entries: [] };
+    byNation[k].entries.push(n);
+  });
+  const container = document.getElementById('nations-full-list');
+  if (!Object.keys(byNation).length) { container.innerHTML = '<div class="empty">Aucune observation</div>'; return; }
+  container.innerHTML = Object.values(byNation).sort((a,b) => b.entries.length - a.entries.length).map(({ nation, entries }) => `
+    <div class="nation-entry">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span class="badge badge-gray" style="font-family:'DM Mono',monospace">${nation.code}</span>
+        <strong style="font-size:13px">${nation.nom}</strong>
+        <span class="badge badge-blue">${entries.length} obs.</span>
+      </div>
+      ${entries.map(e => `
+        <div style="background:var(--surface2);border-radius:7px;padding:8px 10px;margin-bottom:6px;font-size:12px">
+          <div style="color:var(--hint);font-size:11px;margin-bottom:4px">${e.coaches?.prenom} ${e.coaches?.nom} · ${fmtDate(e.date_obs)}</div>
+          ${e.observation ? `<div style="color:var(--text)">${e.observation}</div>` : ''}
+          ${e.a_retenir ? `<div style="color:var(--accent);margin-top:4px">→ ${e.a_retenir}</div>` : ''}
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+function renderMots() {
+  const { journals } = getFiltered();
+  const withMot = journals.filter(j => j.mot_du_jour);
+  const container = document.getElementById('mots-list');
+  if (!withMot.length) { container.innerHTML = '<div class="empty">Aucun mot du jour saisi</div>'; return; }
+  container.innerHTML = withMot.map(j => `
+    <div class="mot-card">
+      "${j.mot_du_jour}"
+      <div class="mot-author">${j.coaches?.prenom} ${j.coaches?.nom} — ${fmtDate(j.date_entree)}</div>
+    </div>`).join('');
+}
+
+// ── RAPPORT FINAL ──────────────────────────────────────────
+function renderRapportFinal() {
+  const el = document.getElementById('rapport-content');
+  el.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted)">Chargement du rapport…</div>';
+
+  // Get competition info
+  const getCompInfo = async () => {
+    const { data } = await sb.from('competitions').select('*').eq('id', activeCompId).single();
+    return data;
+  };
+
+  getCompInfo().then(comp => {
+    if (!comp) { el.innerHTML = '<div style="padding:2rem;color:var(--hint)">Compétition non trouvée</div>'; return; }
+
+    // Prepare data
+    const precompData = allPrecompStaff.length ? allPrecompStaff[0] : null;
+    const postcompData = allPostcompStaff.length ? allPostcompStaff[0] : null;
+
+    // Calculate metrics
+    const totalResults = allResults.filter(r => r.a_nage).length;
+    const medalResults = allResults.filter(r => r.a_nage && r.rang && r.rang <= 3).length;
+    const uniqueCoaches = new Set(allJournals.map(j => j.coach_id)).size;
+    const uniqueAthletes = new Set(allResults.filter(r => r.a_nage).map(r => r.events?.athlete_id)).size;
+    const avgStaffLogistique = allStaffEntries.length ? (allStaffEntries.reduce((s,e) => s+[e.log_trajet,e.log_navette,e.log_hebergement,e.log_restauration,e.log_meteo].filter(x=>x).reduce((a,b)=>a+b,0),0) / (allStaffEntries.length * 5)).toFixed(1) : '—';
+    const avgStaffVie = allStaffEntries.length ? (allStaffEntries.reduce((s,e) => s+[e.vie_attitude,e.vie_cohesion,e.vie_consignes,e.vie_valeurs,e.vie_temps_libre,e.vie_recuperation,e.vie_suivi_medical].filter(x=>x).reduce((a,b)=>a+b,0),0) / (allStaffEntries.length * 7)).toFixed(1) : '—';
+    const medicalInterventions = allStaffEntries.filter(e => e.vie_medecin).length;
+
+    // Calcul des statistiques avancées
+    const stats = computeResultStats(allResults, allEvents);
+    const fmtPct = (pct) => pct !== null ? pct + '%' : '—';
+
+    // Build HTML
+    el.innerHTML = `
+      <div style="max-width:1000px;margin:0 auto;padding:2rem">
+
+        <!-- Header -->
+        <div style="text-align:center;margin-bottom:3rem;padding-bottom:2rem;border-bottom:2px solid var(--border)">
+          <h1 style="margin:0;font-size:28px;color:var(--navy);margin-bottom:8px">Rapport Final de Compétition</h1>
+          <div style="font-size:14px;color:var(--muted);margin-bottom:12px">${comp.nom}</div>
+          <div style="display:flex;justify-content:center;gap:24px;font-size:13px;color:var(--text)">
+            <div><strong>${comp.date_debut?.split('-')[2]}/${comp.date_debut?.split('-')[1]}</strong> au <strong>${comp.date_fin?.split('-')[2]}/${comp.date_fin?.split('-')[1]}</strong></div>
+            <div><strong>${uniqueCoaches}</strong> entraîneur(s) · <strong>${uniqueAthletes}</strong> nageur(s)</div>
+          </div>
+        </div>
+
+        <!-- Synthèse Exécutive -->
+        <div style="background:var(--surface2);border-radius:8px;padding:1.5rem;margin-bottom:2rem">
+          <h2 style="margin:0 0 1rem 0;font-size:16px;color:var(--navy)">Synthèse Exécutive</h2>
+
+          <!-- Ligne 1 : 4 KPIs principaux -->
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1rem">
+            <div style="background:var(--surface);border-radius:8px;padding:12px;border-left:3px solid var(--blue-light)">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Demi-finales</div>
+              <div style="font-size:22px;color:var(--blue-light);font-weight:600;font-family:'DM Mono',monospace">${fmtPct(stats.pctDF)}</div>
+              <div style="font-size:11px;color:var(--hint)">${stats.nbDF} nageur(s) qualifié(s)</div>
+            </div>
+            <div style="background:var(--surface);border-radius:8px;padding:12px;border-left:3px solid var(--accent)">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Finales</div>
+              <div style="font-size:22px;color:var(--accent);font-weight:600;font-family:'DM Mono',monospace">${fmtPct(stats.pctFinale)}</div>
+              <div style="font-size:11px;color:var(--hint)">${stats.nbFinale} nageur(s) en finale</div>
+            </div>
+            <div style="background:var(--surface);border-radius:8px;padding:12px;border-left:3px solid var(--success)">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Podiums</div>
+              <div style="font-size:22px;color:var(--success);font-weight:600;font-family:'DM Mono',monospace">${fmtPct(stats.pctPodium)}</div>
+              <div style="font-size:11px;color:var(--hint)">${stats.nbPodium} podium(s)</div>
+            </div>
+            <div style="background:var(--surface);border-radius:8px;padding:12px;border-left:3px solid var(--accent2)">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Minima battus</div>
+              <div style="font-size:22px;color:var(--accent2);font-weight:600;font-family:'DM Mono',monospace">${fmtPct(stats.pctEngagement)}</div>
+              <div style="font-size:11px;color:var(--hint)">${stats.engagementBattus} sur ${stats.totalAvecEngagement} épreuves</div>
+            </div>
+          </div>
+
+          <!-- Résumé textuel -->
+          <div style="font-size:13px;line-height:1.6;color:var(--text)">
+            La compétition s'est déroulée du <strong>${fmtDate(comp.date_debut)}</strong> au <strong>${fmtDate(comp.date_fin)}</strong>,
+            avec <strong>${uniqueCoaches} entraîneur(s)</strong> et <strong>${uniqueAthletes} nageur(s)</strong>.
+            ${stats.nbDF > 0 ? `<strong>${stats.nbDF} nageur(s)</strong> ont atteint les demi-finales (${fmtPct(stats.pctDF)} du quota national), ` : ''}
+            ${stats.nbFinale > 0 ? `<strong>${stats.nbFinale}</strong> ont disputé une finale (${fmtPct(stats.pctFinale)} de réussite), ` : ''}
+            dont <strong>${stats.nbPodium} podium(s)</strong>.
+            ${stats.totalAvecEngagement > 0 ? `Sur ${stats.totalAvecEngagement} épreuves avec temps de référence, <strong>${stats.engagementBattus} minima</strong> ont été battus (${fmtPct(stats.pctEngagement)}).` : ''}
+          </div>
+        </div>
+
+        <!-- Phase Préparation -->
+        <div style="margin-bottom:2rem">
+          <h2 style="font-size:16px;color:var(--navy);border-bottom:2px solid var(--teal);padding-bottom:8px;margin-bottom:1rem">Phase de Préparation</h2>
+          <div style="background:var(--surface2);border-left:4px solid var(--teal);padding:1rem;border-radius:4px">
+            <div style="font-size:13px;line-height:1.6;color:var(--text)">
+              ${precompData ? `
+                <div style="margin-bottom:8px"><strong>État du Groupe:</strong></div>
+                <div style="margin-bottom:12px;padding-left:1rem;font-size:12px">
+                  • Forme générale: ${precompData.groupe_forme_generale || '—'}/5<br/>
+                  • Motivation: ${precompData.groupe_motivation || '—'}/5<br/>
+                  • Cohésion: ${precompData.groupe_cohesion || '—'}/5
+                </div>
+                <div><strong>État des Préparatifs:</strong></div>
+                <div style="margin-bottom:8px;padding-left:1rem;font-size:12px;color:var(--muted)">Logistique: ${avgStaffLogistique}/5</div>
+              ` : '<div style="color:var(--hint);font-size:12px">Données de préparation non disponibles</div>'}
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase Compétition -->
+        <div style="margin-bottom:2rem">
+          <h2 style="font-size:16px;color:var(--navy);border-bottom:2px solid var(--accent);padding-bottom:8px;margin-bottom:1rem">Phase de Compétition</h2>
+          <div style="background:var(--surface2);border-left:4px solid var(--accent);padding:1rem;border-radius:4px">
+            <div style="font-size:13px;line-height:1.6;color:var(--text)">
+              <div style="margin-bottom:12px">
+                <strong>Performance Générale:</strong><br/>
+                <div style="margin-top:8px;padding-left:1rem;font-size:12px">
+                  • Nageurs en compétition : <strong>${uniqueAthletes}</strong><br/>
+                  • Demi-finales : <strong>${stats.nbDF}</strong> nageur(s) — <strong>${fmtPct(stats.pctDF)}</strong> du quota national<br/>
+                  • Finales : <strong>${stats.nbFinale}</strong> nageur(s) — <strong>${fmtPct(stats.pctFinale)}</strong> de réussite<br/>
+                  • Podiums : <strong>${stats.nbPodium}</strong> — <strong>${fmtPct(stats.pctPodium)}</strong> des finalistes<br/>
+                  • Minima battus : <strong>${stats.engagementBattus}</strong> sur <strong>${stats.totalAvecEngagement}</strong> épreuves (<strong>${fmtPct(stats.pctEngagement)}</strong>)
+                </div>
+              </div>
+              <div>
+                <strong>Dynamique d'Équipe:</strong><br/>
+                <div style="margin-top:8px;padding-left:1rem;font-size:12px">
+                  • Qualité de vie: ${avgStaffVie}/5<br/>
+                  • Interventions médicales: ${medicalInterventions}<br/>
+                  • Jours de suivi: ${allStaffEntries.length}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Résultats détaillés par nageur -->
+        <div style="margin-bottom:2rem">
+          <h2 style="font-size:16px;color:var(--navy);border-bottom:2px solid var(--accent);padding-bottom:8px;margin-bottom:1rem">Résultats Individuels</h2>
+
+          ${(() => {
+            const byAthlete = {};
+            allResults.forEach(r => {
+              const id = r.events?.athlete_id;
+              const name = r.events?.athletes ? r.events.athletes.prenom + ' ' + r.events.athletes.nom : '—';
+              if (!byAthlete[id]) byAthlete[id] = { name, results: [] };
+              byAthlete[id].results.push(r);
+            });
+
+            return Object.values(byAthlete).sort((a,b) => a.name.localeCompare(b.name)).map(({name, results}) => {
+              const nbNage = results.filter(r => r.a_nage).length;
+              const nbPodium = results.filter(r => r.a_nage && r.rang && r.rang <= 3).length;
+              const rows = results.sort((a,b) => {
+                const order = ['serie','demi-finale','finale'];
+                return order.indexOf(a.events?.tour) - order.indexOf(b.events?.tour);
+              }).map(r => {
+                const engBattu = r.a_nage && r.events?.temps_engagement && r.temps &&
+                                 compareTemps(r.temps, r.events.temps_engagement) < 0;
+                return `<tr>
+                  <td style="font-size:11px">${r.events?.epreuve}</td>
+                  <td>${badgeTour(r.events?.tour)}</td>
+                  <td style="font-family:'DM Mono',monospace;font-size:11px">${r.temps || '—'}${engBattu ? ' <span style="color:var(--success)">↓</span>' : ''}</td>
+                  <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.temps_engagement || '—'}</td>
+                  <td>${r.rang ? `<span class="badge ${r.rang<=3?'badge-green':r.rang<=8?'badge-orange':'badge-gray'}">${r.rang<=3?'🏅 ':''}${r.rang}</span>` : r.a_nage ? '—' : '<span class="badge badge-red">DNS</span>'}</td>
+                </tr>`;
+              }).join('');
+
+              return `<div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:10px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                  <strong style="font-size:13px">${name}</strong>
+                  <div style="display:flex;gap:6px">
+                    <span class="badge badge-gray">${nbNage} épreuve(s)</span>
+                    ${nbPodium ? `<span class="badge badge-green">🏅 ${nbPodium} podium(s)</span>` : ''}
+                  </div>
+                </div>
+                <table class="data-table" style="background:var(--surface)">
+                  <thead><tr><th>Épreuve</th><th>Tour</th><th>Temps</th><th>Réf.</th><th>Rang</th></tr></thead>
+                  <tbody>${rows}</tbody>
+                </table>
+              </div>`;
+            }).join('');
+          })()}
+        </div>
+
+        <!-- Phase Bilan -->
+        <div style="margin-bottom:2rem">
+          <h2 style="font-size:16px;color:var(--navy);border-bottom:2px solid var(--success);padding-bottom:8px;margin-bottom:1rem">Phase de Bilan</h2>
+          <div style="background:var(--surface2);border-left:4px solid var(--success);padding:1rem;border-radius:4px">
+            <div style="font-size:13px;line-height:1.6;color:var(--text)">
+              ${postcompData ? `
+                <div style="margin-bottom:12px">
+                  <strong>Points Forts:</strong><br/>
+                  <div style="margin-top:8px;padding-left:1rem;font-size:12px;color:var(--text)">${postcompData.points_forts || 'Non renseigné'}</div>
+                </div>
+                <div style="margin-bottom:12px">
+                  <strong>Points à Améliorer:</strong><br/>
+                  <div style="margin-top:8px;padding-left:1rem;font-size:12px;color:var(--text)">${postcompData.points_ameliorer || 'Non renseigné'}</div>
+                </div>
+                <div>
+                  <strong>Recommandations:</strong><br/>
+                  <div style="margin-top:8px;padding-left:1rem;font-size:12px;color:var(--text)">
+                    ${postcompData.recommandations_sport ? '<div>Domaine sportif: ' + postcompData.recommandations_sport + '</div>' : ''}
+                    ${postcompData.recommandations_orga ? '<div style="margin-top:4px">Domaine organisationnel: ' + postcompData.recommandations_orga + '</div>' : ''}
+                  </div>
+                </div>
+              ` : '<div style="color:var(--hint);font-size:12px">Données de bilan non disponibles</div>'}
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align:center;padding-top:2rem;border-top:1px solid var(--border);color:var(--muted);font-size:12px">
+          Rapport généré le ${new Date().toLocaleDateString('fr-FR')} · FFN Journal de bord
+        </div>
+
+      </div>
+    `;
+  });
+}
+
+// ── TABS ──────────────────────────────────────────────────
+function showTab(tab) {
+  currentTab = tab;
+  ['synthese','resultats','entraineurs','nations','mots','staff','rapport'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['synthese','resultats','entraineurs','nations','mots','staff','rapport'][i] === tab);
+  });
+  if (tab === 'rapport') renderRapportFinal();
+  else renderDashboard();
+}
+
+// ── STAFF TAB ────────────────────────────────────────────
+function showStaffSubTab(tab) {
+  currentStaffSubTab = tab;
+  ['comp','precomp','postcomp'].forEach(t => {
+    const el = document.getElementById('staff-subtab-' + t);
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('.subtab-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['comp','precomp','postcomp'][i] === tab);
+  });
+  renderStaffSubTab();
+}
+
+function renderStaffSubTab() {
+  if (currentStaffSubTab === 'comp') renderStaffComp();
+  else if (currentStaffSubTab === 'precomp') renderStaffPrecomp();
+  else if (currentStaffSubTab === 'postcomp') renderStaffPostcomp();
+}
+
+function renderStaffComp() {
+  const c = document.getElementById('staff-subtab-comp');
+  if (!allStaffEntries.length) { c.innerHTML = '<div class="empty">Aucune donnée staff de compétition saisie</div>'; return; }
+  const logK = ['log_trajet','log_navette','log_hebergement','log_restauration','log_meteo'];
+  const sptK = ['sport_comen','sport_medailles','sport_mpp','sport_fluidite_csp'];
+  const vieK = ['vie_attitude','vie_cohesion','vie_consignes','vie_valeurs','vie_temps_libre','vie_recuperation','vie_suivi_medical'];
+  const avg = (entries, keys) => { const v=entries.flatMap(e=>keys.map(k=>e[k]).filter(x=>x!=null)); return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):'—'; };
+  const nbMedecin = allStaffEntries.filter(e => e.vie_medecin).length;
+  const chartData = allStaffEntries.map(e => ({ date:e.date_entree, log:avg([e],logK), sport:avg([e],sptK), vie:avg([e],vieK) }));
+  c.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:14px">
+      <div class="kpi-card blue" style="border:none;background:var(--surface3)"><div class="kpi-label">Jours saisis</div><div class="kpi-value">${allStaffEntries.length}</div></div>
+      <div class="kpi-card" style="border:none;background:var(--surface3)"><div class="kpi-label">Moy. logistique</div><div class="kpi-value" style="font-size:22px">${avg(allStaffEntries,logK)}<span style="font-size:14px">/5</span></div></div>
+      <div class="kpi-card accent" style="border:none;background:var(--surface3)"><div class="kpi-label">Moy. sportif</div><div class="kpi-value" style="font-size:22px">${avg(allStaffEntries,sptK)}<span style="font-size:14px">/5</span></div></div>
+      <div class="kpi-card green" style="border:none;background:var(--surface3)"><div class="kpi-label">Interventions médecin</div><div class="kpi-value">${nbMedecin}</div></div>
+    </div>
+    <div style="padding:0 14px 14px">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">Évolution quotidienne — moyennes par catégorie</div>
+      ${renderStaffChart(chartData)}
+    </div>
+    <table class="data-table">
+      <thead><tr><th>Date</th><th>Logistique</th><th>Sportif</th><th>Vie de groupe</th><th>Médecin</th><th>Observations</th></tr></thead>
+      <tbody>${allStaffEntries.map(e => `<tr>
+        <td style="font-family:'DM Mono',monospace;white-space:nowrap">${fmtDate(e.date_entree)}</td>
+        <td><div style="display:flex;align-items:center;gap:6px">${scorePips(Math.round(parseFloat(avg([e],logK))))}<span style="font-size:11px;color:var(--muted)">${avg([e],logK)}</span></div></td>
+        <td><div style="display:flex;align-items:center;gap:6px">${scorePips(Math.round(parseFloat(avg([e],sptK))))}<span style="font-size:11px;color:var(--muted)">${avg([e],sptK)}</span></div></td>
+        <td><div style="display:flex;align-items:center;gap:6px">${scorePips(Math.round(parseFloat(avg([e],vieK))))}<span style="font-size:11px;color:var(--muted)">${avg([e],vieK)}</span></div></td>
+        <td>${e.vie_medecin?'<span class="badge badge-orange">Oui</span>':'<span class="badge badge-gray">Non</span>'}</td>
+        <td style="font-size:11px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.observations_generales||'—'}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+}
+
+function renderStaffChart(chartData) {
+  if (!chartData.length) return '<div class="empty">Aucune donnée</div>';
+  const rowH = 56, pad = 12, lblW = 65, barZone = 240;
+  const h = chartData.length * rowH + pad * 2;
+  const cats = [['log','var(--blue-light)','Logistique'],['sport','var(--accent)','Sportif'],['vie','var(--teal)','Vie']];
+  let rows = '';
+  chartData.forEach((d, i) => {
+    const y = pad + i * rowH;
+    rows += `<text x="${lblW - 4}" y="${y + 14}" font-size="10" fill="#5A6478" text-anchor="end">${fmtDate(d.date)}</text>`;
+    cats.forEach(([key, color], ki) => {
+      const val = parseFloat(d[key]);
+      if (isNaN(val)) return;
+      const bw = (val / 5) * barZone;
+      rows += `<rect x="${lblW}" y="${y + ki * 16}" width="${bw}" height="12" rx="2" fill="${color}" opacity="0.82"/>`;
+      rows += `<text x="${lblW + bw + 3}" y="${y + ki * 16 + 10}" font-size="9" fill="#9AA3B5">${val.toFixed(1)}</text>`;
+    });
+  });
+  const svgW = lblW + barZone + 30;
+  return `<svg viewBox="0 0 ${svgW} ${h}" style="width:100%;height:${h}px;display:block">${rows}</svg>
+    <div style="display:flex;gap:16px;padding-top:4px;font-size:11px;color:var(--muted)">
+      ${cats.map(([,color,lbl])=>`<span><span style="display:inline-block;width:10px;height:10px;background:${color};border-radius:2px;margin-right:4px;vertical-align:middle"></span>${lbl}</span>`).join('')}
+    </div>`;
+}
+
+function renderStaffPrecomp() {
+  const c = document.getElementById('staff-subtab-precomp');
+  if (!allPrecompStaff.length) { c.innerHTML = '<div class="empty">Aucune donnée pré-compétition staff saisie</div>'; return; }
+  const logChecks = ['log_convocations','log_passeports','log_engagements','log_fiche_sanitaire','log_attestation','log_accreditations','log_reunion_technique','log_creneaux_entrainement'];
+  const matBadge = v => v ? `<span class="badge ${v==='Conforme'?'badge-green':v==='Partiel'?'badge-orange':'badge-red'}">${v}</span>` : '—';
+  c.innerHTML = `<div style="padding:14px;display:flex;flex-direction:column;gap:12px">` + allPrecompStaff.map(e => {
+    const done = logChecks.filter(k => e[k]).length;
+    return `<div style="background:var(--surface2);border-radius:8px;padding:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <strong style="font-size:13px">${fmtDate(e.date_entree)}</strong>
+        <span class="badge badge-blue">Checklist ${done}/8</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        ${e.groupe_forme_generale?`<span class="badge badge-gray">Forme ${e.groupe_forme_generale}/5</span>`:''}
+        ${e.groupe_motivation?`<span class="badge badge-orange">Motivation ${e.groupe_motivation}/5</span>`:''}
+        ${e.groupe_cohesion?`<span class="badge badge-green">Cohésion ${e.groupe_cohesion}/5</span>`:''}
+      </div>
+      <div style="background:var(--border);border-radius:3px;height:6px;margin-bottom:8px"><div style="width:${done/8*100}%;height:100%;background:var(--teal);border-radius:3px"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:12px">
+        ${e.mat_tenues?`<div><span style="color:var(--muted)">Tenues :</span> ${matBadge(e.mat_tenues)}</div>`:''}
+        ${e.mat_equipement_comp?`<div><span style="color:var(--muted)">Équip. comp. :</span> ${matBadge(e.mat_equipement_comp)}</div>`:''}
+        ${e.mat_equipement_analyse?`<div><span style="color:var(--muted)">Analyse :</span> ${matBadge(e.mat_equipement_analyse)}</div>`:''}
+        ${e.mat_medical?`<div><span style="color:var(--muted)">Médical :</span> ${matBadge(e.mat_medical)}</div>`:''}
+      </div>
+    </div>`;
+  }).join('') + `</div>`;
+}
+
+function renderStaffPostcomp() {
+  const c = document.getElementById('staff-subtab-postcomp');
+  if (!allPostcompStaff.length) { c.innerHTML = '<div class="empty">Aucune donnée bilan post-comp staff saisie</div>'; return; }
+  const e = allPostcompStaff[0];
+  const stars = n => n ? '★'.repeat(n)+'☆'.repeat(5-n) : '☆☆☆☆☆';
+  const bilanColors = {'Très positif':'badge-green','Positif':'badge-blue','Mitigé':'badge-orange','Décevant':'badge-red'};
+  const bilanRows = [['Sportif','bilan_sportif'],['Encadrement','bilan_encadrement'],['Logistique','bilan_logistique'],['Déplacement','bilan_deplacement'],['Organisation','bilan_organisation']];
+  const encRows = [['Communication staff ↔ nageurs','enc_communication'],['Cohésion interne du staff','enc_cohesion'],['Relation avec l\'organisation','enc_relation_orga'],['Gestion des imprévus','enc_gestion_imprevus']];
+  c.innerHTML = `<div style="padding:14px;display:flex;flex-direction:column;gap:14px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Bilan par domaine</div>
+        ${bilanRows.map(([lbl,k])=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px">${lbl}</span>${e[k]?`<span class="badge ${bilanColors[e[k]]||'badge-gray'}">${e[k]}</span>`:'<span class="badge badge-gray">—</span>'}</div>`).join('')}
+        ${e.note_globale?`<div style="margin-top:10px;display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600">Note globale</span><span style="color:var(--accent2);font-size:16px">${stars(e.note_globale)}</span></div>`:''}
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Encadrement</div>
+        ${encRows.map(([lbl,k])=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;color:var(--muted)">${lbl}</span><span style="color:var(--accent2);font-size:14px">${stars(e[k])}</span></div>`).join('')}
+      </div>
+    </div>
+    ${e.points_forts||e.points_ameliorer?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      ${e.points_forts?`<div><div style="font-size:11px;font-weight:600;color:var(--success);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Points forts</div><div style="font-size:13px">${e.points_forts}</div></div>`:''}
+      ${e.points_ameliorer?`<div><div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Points à améliorer</div><div style="font-size:13px">${e.points_ameliorer}</div></div>`:''}
+    </div>`:''}
+    ${e.recommandations_sport||e.recommandations_orga?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      ${e.recommandations_sport?`<div><div style="font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Recommandations sportives</div><div style="font-size:13px">${e.recommandations_sport}</div></div>`:''}
+      ${e.recommandations_orga?`<div><div style="font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Recommandations organisationnelles</div><div style="font-size:13px">${e.recommandations_orga}</div></div>`:''}
+    </div>`:''}
+    ${e.conclusions_dtn?`<div style="background:var(--surface2);border-radius:8px;padding:12px;border-left:3px solid var(--teal)"><div style="font-size:11px;font-weight:600;color:var(--teal);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Conclusions DTN</div><div style="font-size:13px">${e.conclusions_dtn}</div></div>`:''}
+  </div>`;
+}
+
+// ── HELPERS ──────────────────────────────────────────────
+function fmtDate(d) { if (!d) return '—'; const p = d.split('-'); return p[2]+'/'+p[1]+'/'+p[0].slice(2); }
+function scorePips(n) {
+  if (!n) return '<span style="color:var(--hint)">—</span>';
+  return '<div class="score-bar">' + [1,2,3,4,5].map(i => `<div class="score-pip${i<=n?' filled':''}"></div>`).join('') + '</div>';
+}
+function renderProgressBar(value, color) {
+  if (!value) return '';
+  const pct = (value / 5) * 100;
+  return `<div style="width:50px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:4px"><div style="width:${pct}%;height:100%;background:${color};border-radius:2px"></div></div>`;
+}
+function badgeTour(t) {
+  const map = { serie: 'badge-gray', 'demi-finale': 'badge-orange', finale: 'badge-green' };
+  return `<span class="badge ${map[t]||'badge-gray'}">${t||'—'}</span>`;
+}
+
+// ── PDF EXPORT ──────────────────────────────────────────
+function exportDashboardPDF() {
+  const tabMap = {
+    'synthese': 'Synthèse',
+    'resultats': 'Résultats',
+    'entraineurs': 'Entraîneurs',
+    'nations': 'Nations',
+    'mots': 'Mots du jour',
+    'staff': 'Staff',
+    'rapport': 'Rapport Final'
+  };
+
+  const tabName = tabMap[currentTab] || currentTab;
+  const element = document.getElementById('tab-' + currentTab);
+
+  if (!element) {
+    alert('Aucun contenu à exporter');
+    return;
+  }
+
+  const opt = {
+    margin: 10,
+    filename: `Dashboard_${tabName.replace(/\\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 1.5 },
+    jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4' }
+  };
+
+  // Temporarily show element if hidden
+  const wasHidden = element.style.display === 'none';
+  if (wasHidden) element.style.display = '';
+
+  html2pdf().set(opt).from(element).save().then(() => {
+    if (wasHidden) element.style.display = 'none';
+  });
+}
+
+init();
+</script>
+</body>
+</html>

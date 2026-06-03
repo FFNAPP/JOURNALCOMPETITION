@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FFN — Administration</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --navy: #0A1628;
+    --blue: #1B4F8A;
+    --blue-light: #2563C4;
+    --accent: #E8632A;
+    --accent2: #F0A500;
+    --surface: #ffffff;
+    --surface2: #F4F6FA;
+    --surface3: #EBF0F8;
+    --border: #DDE3EE;
+    --text: #0A1628;
+    --muted: #5A6478;
+    --hint: #9AA3B5;
+    --success: #1A7A4A;
+    --error: #C0392B;
+    --r: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--surface2); color: var(--text); min-height: 100vh; }
+
+  /* HEADER */
+  .header {
+    background: var(--navy);
+    padding: 0 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 56px; position: sticky; top: 0; z-index: 100;
+  }
+  .header-brand { display: flex; align-items: center; gap: 12px; }
+  .header-logo {
+    width: 32px; height: 32px; background: var(--accent);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 600; color: #fff;
+  }
+  .header-title { color: #fff; font-size: 15px; font-weight: 500; }
+  .header-badge { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); font-size: 11px; padding: 3px 8px; border-radius: 4px; font-family: 'DM Mono', monospace; }
+
+  /* LAYOUT */
+  .layout { display: flex; min-height: calc(100vh - 56px); }
+  .sidebar {
+    width: 220px; background: var(--surface); border-right: 1px solid var(--border);
+    padding: 1.5rem 0; flex-shrink: 0; position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto;
+  }
+  .sidebar-section { margin-bottom: 1.5rem; }
+  .sidebar-label { font-size: 10px; font-weight: 600; color: var(--hint); letter-spacing: 0.08em; text-transform: uppercase; padding: 0 1.25rem; margin-bottom: 6px; }
+  .sidebar-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 1.25rem; cursor: pointer; font-size: 13px; color: var(--muted);
+    transition: all 0.12s; border-left: 2px solid transparent;
+  }
+  .sidebar-item:hover { background: var(--surface2); color: var(--text); }
+  .sidebar-item.active { background: #EBF3FF; color: var(--blue-light); border-left-color: var(--blue-light); font-weight: 500; }
+  .sidebar-item svg { flex-shrink: 0; opacity: 0.7; }
+
+  /* MAIN */
+  .main { flex: 1; padding: 2rem; max-width: 960px; }
+  .page-section { display: none; }
+  .page-section.active { display: block; }
+
+  .page-title { font-size: 20px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
+  .page-sub { font-size: 13px; color: var(--muted); margin-bottom: 1.5rem; }
+
+  /* CARDS */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 1.25rem; margin-bottom: 1rem;
+  }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--navy); margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; }
+  .card-title span { background: var(--surface3); padding: 2px 8px; border-radius: 4px; font-size: 11px; color: var(--muted); font-weight: 400; }
+
+  /* FORMS */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .form-full { grid-column: 1 / -1; }
+  label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; font-weight: 500; }
+  input[type=text], input[type=email], input[type=date], input[type=time], select, textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px;
+    font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--text);
+    background: var(--surface); transition: border-color 0.15s;
+    outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--blue-light); box-shadow: 0 0 0 3px rgba(37,99,196,0.08); }
+  textarea { resize: vertical; min-height: 70px; }
+
+  /* BUTTONS */
+  .btn {
+    padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 500;
+    cursor: pointer; border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); transition: all 0.12s; display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .btn:hover { background: var(--surface2); }
+  .btn-primary { background: var(--blue-light); color: #fff; border-color: var(--blue-light); }
+  .btn-primary:hover { background: var(--blue); border-color: var(--blue); }
+  .btn-accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-accent:hover { opacity: 0.9; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-danger { color: var(--error); border-color: #fcc; }
+  .btn-danger:hover { background: #fff0f0; }
+
+  /* TABLES */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .data-table th { text-align: left; font-size: 11px; font-weight: 600; color: var(--hint); letter-spacing: 0.05em; text-transform: uppercase; padding: 8px 10px; border-bottom: 1px solid var(--border); background: var(--surface2); }
+  .data-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--text); }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--surface2); }
+  .data-table .actions { display: flex; gap: 4px; }
+
+  /* BADGES */
+  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .badge-blue { background: #EBF3FF; color: var(--blue-light); }
+  .badge-green { background: #E6F6ED; color: var(--success); }
+  .badge-orange { background: #FFF3E8; color: var(--accent); }
+  .badge-gray { background: var(--surface3); color: var(--muted); }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 1.5rem; right: 1.5rem;
+    background: var(--navy); color: #fff;
+    padding: 10px 16px; border-radius: 8px; font-size: 13px;
+    transform: translateY(80px); opacity: 0; transition: all 0.25s;
+    z-index: 999; display: flex; align-items: center; gap: 8px;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.error { background: var(--error); }
+
+  /* DIVIDER */
+  .divider { height: 1px; background: var(--border); margin: 1rem 0; }
+
+  /* SECTION HEADER */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; padding: 2rem; color: var(--hint); font-size: 13px; }
+  .empty svg { opacity: 0.3; margin-bottom: 8px; }
+
+  /* COMP SELECTOR */
+  .comp-selector {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 1rem 1.25rem;
+    display: flex; align-items: center; gap: 12px; margin-bottom: 1.5rem;
+  }
+  .comp-selector label { margin: 0; white-space: nowrap; }
+  .comp-selector select { flex: 1; }
+
+  /* CSV ZONE */
+  .csv-zone {
+    border: 1.5px dashed var(--border); border-radius: var(--r);
+    padding: 1.5rem; text-align: center; background: var(--surface2);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .csv-zone:hover { border-color: var(--blue-light); background: #EBF3FF; }
+  .csv-zone p { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .csv-zone small { font-size: 11px; color: var(--hint); font-family: 'DM Mono', monospace; }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(10,22,40,0.5);
+    z-index: 200; display: none; align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border-radius: 12px; padding: 1.5rem;
+    width: 520px; max-width: 95vw; max-height: 85vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  }
+  .modal-title { font-size: 16px; font-weight: 600; color: var(--navy); margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; }
+  .modal-close { cursor: pointer; color: var(--hint); font-size: 18px; line-height: 1; }
+
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 1rem; background: var(--surface2); padding: 4px; border-radius: 8px; }
+  .tab-btn { flex: 1; padding: 7px; border: none; background: none; font-size: 12px; font-weight: 500; color: var(--muted); cursor: pointer; border-radius: 6px; transition: all 0.12s; font-family: 'DM Sans', sans-serif; }
+  .tab-btn.active { background: var(--surface); color: var(--blue-light); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-brand">
+    <div class="header-logo">FFN</div>
+    <div class="header-title">Administration — Journal de bord</div>
+  </div>
+  <div class="header-badge">ADMIN</div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Compétitions</div>
+      <div class="sidebar-item active" data-section="competitions" onclick="showSection('competitions')">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Compétitions
+      </div>
+      <div class="sidebar-item" data-section="programme" onclick="showSection('programme')">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Programme
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Personnes</div>
+      <div class="sidebar-item" data-section="coaches" onclick="showSection('coaches')">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        Entraîneurs
+      </div>
+      <div class="sidebar-item" data-section="athletes" onclick="showSection('athletes')">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M3 21a9 9 0 0118 0"/></svg>
+        Nageurs
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Référentiels</div>
+      <div class="sidebar-item" data-section="nations" onclick="showSection('nations')">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
+        Nations
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- COMPÉTITIONS -->
+    <div class="page-section active" id="section-competitions">
+      <div class="page-title">Compétitions</div>
+      <div class="page-sub">Gérez les compétitions. Chaque compétition est une clé indépendante dans la base.</div>
+
+      <div class="card">
+        <div class="card-title">Nouvelle compétition</div>
+
+        <!-- Infos générales -->
+        <div class="form-grid" style="margin-bottom:1rem">
+          <div><label>Nom de la compétition *</label><input type="text" id="c-nom" placeholder="Championnats du Monde 2025"></div>
+          <div><label>Lieu</label><input type="text" id="c-lieu" placeholder="Budapest"></div>
+          <div><label>Type de compétition</label>
+            <select id="c-type">
+              <option value="">— Non défini —</option>
+              <optgroup label="Natation Course">
+                <option value="CEJ">CEJ — Championnats d'Europe Juniors</option>
+                <option value="CE">CE — Championnats d'Europe</option>
+                <option value="CMJ">CMJ — Championnats du Monde Juniors</option>
+                <option value="CM">CM — Championnats du Monde</option>
+                <option value="JO">JO — Jeux Olympiques</option>
+                <option value="CDM">CDM — Coupe du Monde</option>
+                <option value="COMEN">COMEN</option>
+              </optgroup>
+              <optgroup label="Eau Libre">
+                <option value="CEJ_EL">CEJ/CMJ Eau Libre</option>
+                <option value="EL_Senior">EL Senior</option>
+              </optgroup>
+            </select>
+          </div>
+          <div><label>Pays</label><input type="text" id="c-pays" placeholder="Hongrie"></div>
+          <div><label>Statut</label>
+            <select id="c-statut">
+              <option value="preparation">En préparation</option>
+              <option value="en_cours" selected>En cours</option>
+              <option value="terminee">Terminée</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Calendrier des phases — 4 dates -->
+        <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;margin-bottom:1rem">
+          <div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:10px;display:flex;align-items:center;gap:6px">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Calendrier des phases
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+
+            <div style="background:var(--surface);border:1px solid #C9BAE8;border-radius:8px;padding:10px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                <span style="width:8px;height:8px;border-radius:50%;background:#6B3FA0;flex-shrink:0"></span>
+                <span style="font-size:11px;font-weight:600;color:#6B3FA0;text-transform:uppercase;letter-spacing:.05em">Stage</span>
+              </div>
+              <div style="margin-bottom:6px">
+                <label style="font-size:11px;color:var(--hint)">Début</label>
+                <input type="date" id="c-stage-debut" style="font-size:12px;padding:5px 7px">
+              </div>
+              <div>
+                <label style="font-size:11px;color:var(--hint)">Fin</label>
+                <input type="date" id="c-stage-fin" style="font-size:12px;padding:5px 7px">
+              </div>
+              <div style="font-size:10px;color:var(--hint);margin-top:6px">Formulaire stage actif</div>
+            </div>
+
+            <div style="background:var(--surface);border:1px solid #A3D8D7;border-radius:8px;padding:10px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                <span style="width:8px;height:8px;border-radius:50%;background:var(--teal);flex-shrink:0"></span>
+                <span style="font-size:11px;font-weight:600;color:var(--teal);text-transform:uppercase;letter-spacing:.05em">Voyage</span>
+              </div>
+              <div style="margin-bottom:6px">
+                <label style="font-size:11px;color:var(--hint)">Date aller</label>
+                <input type="date" id="c-voyage-aller" style="font-size:12px;padding:5px 7px">
+              </div>
+              <div>
+                <label style="font-size:11px;color:var(--hint)">Date retour</label>
+                <input type="date" id="c-voyage-retour" style="font-size:12px;padding:5px 7px">
+              </div>
+              <div style="font-size:10px;color:var(--hint);margin-top:6px">Formulaire voyage actif</div>
+            </div>
+
+            <div style="background:var(--surface);border:1px solid #F5C9B3;border-radius:8px;padding:10px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                <span style="width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0"></span>
+                <span style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.05em">Compétition</span>
+              </div>
+              <div style="margin-bottom:6px">
+                <label style="font-size:11px;color:var(--hint)">Début</label>
+                <input type="date" id="c-debut" style="font-size:12px;padding:5px 7px">
+              </div>
+              <div>
+                <label style="font-size:11px;color:var(--hint)">Fin</label>
+                <input type="date" id="c-fin" style="font-size:12px;padding:5px 7px">
+              </div>
+              <div style="font-size:10px;color:var(--hint);margin-top:6px">Journal compétition actif</div>
+            </div>
+
+            <div style="background:var(--surface);border:1px solid #A8DBBF;border-radius:8px;padding:10px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                <span style="width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0"></span>
+                <span style="font-size:11px;font-weight:600;color:var(--success);text-transform:uppercase;letter-spacing:.05em">Bilan</span>
+              </div>
+              <div>
+                <label style="font-size:11px;color:var(--hint)">Date bilan (J+1)</label>
+                <input type="date" id="c-bilan" style="font-size:12px;padding:5px 7px">
+              </div>
+              <div style="font-size:10px;color:var(--hint);margin-top:6px">Formulaire bilan actif</div>
+            </div>
+
+          </div>
+        </div>
+
+        <div>
+          <button class="btn btn-primary" onclick="saveCompetition()">+ Créer la compétition</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-header">
+          <div class="card-title">Compétitions enregistrées <span id="comp-count">0</span></div>
+          <button class="btn btn-sm" onclick="loadCompetitions()">↺ Actualiser</button>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Nom</th><th>Lieu</th><th>Dates</th><th>Statut</th><th>Actions</th></tr></thead>
+          <tbody id="comp-list"><tr><td colspan="5" class="empty">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PROGRAMME -->
+    <div class="page-section" id="section-programme">
+      <div class="page-title">Programme de compétition</div>
+      <div class="page-sub">Associez les entraîneurs et nageurs à une compétition, puis saisissez ou importez le programme d'épreuves.</div>
+
+      <div class="comp-selector">
+        <label>Compétition active :</label>
+        <select id="prog-comp-select" onchange="onProgCompChange()"><option value="">— Choisir —</option></select>
+      </div>
+
+      <div id="prog-content" style="display:none">
+        <!-- Onglets -->
+        <div class="tab-bar">
+          <button class="tab-btn active" onclick="showProgTab('liaisons')">Associations</button>
+          <button class="tab-btn" onclick="showProgTab('epreuves')">Épreuves</button>
+          <button class="tab-btn" onclick="showProgTab('import')">Import CSV</button>
+        </div>
+
+        <!-- TAB : Liaisons -->
+        <div id="prog-tab-liaisons">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div class="card">
+              <div class="card-title">Entraîneurs de la compétition</div>
+              <div style="margin-bottom:10px;display:flex;gap:8px">
+                <select id="add-coach-select" style="flex:1"><option value="">— Sélectionner —</option></select>
+                <button class="btn btn-sm btn-primary" onclick="addCoachToComp()">Ajouter</button>
+              </div>
+              <div id="comp-coaches-list"></div>
+            </div>
+            <div class="card">
+              <div class="card-title">Nageurs de la compétition</div>
+              <div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap">
+                <select id="add-athlete-select" style="flex:1;min-width:120px"><option value="">— Nageur —</option></select>
+                <select id="add-athlete-coach" style="flex:1;min-width:120px"><option value="">— Entraîneur —</option></select>
+                <button class="btn btn-sm btn-primary" onclick="addAthleteToComp()">Ajouter</button>
+              </div>
+              <div id="comp-athletes-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB : Épreuves -->
+        <div id="prog-tab-epreuves" style="display:none">
+          <div class="card">
+            <div class="card-title">Ajouter une épreuve</div>
+            <div class="form-grid-3">
+              <div>
+                <label>Nageur *</label>
+                <select id="ev-athlete"><option value="">—</option></select>
+              </div>
+              <div>
+                <label>Épreuve *</label>
+                <select id="ev-epreuve" onchange="onEpreuveChange()">
+                  <option>50m Nage libre</option><option>100m Nage libre</option><option>200m Nage libre</option>
+                  <option>400m Nage libre</option><option>800m Nage libre</option><option>1500m Nage libre</option>
+                  <option>50m Dos</option><option>100m Dos</option><option>200m Dos</option>
+                  <option>50m Brasse</option><option>100m Brasse</option><option>200m Brasse</option>
+                  <option>50m Papillon</option><option>100m Papillon</option><option>200m Papillon</option>
+                  <option>200m 4 Nages</option><option>400m 4 Nages</option>
+                  <option>4x100m NL</option><option>4x200m NL</option><option>4x100m 4N</option>
+                  <option disabled style="color:var(--hint);font-size:11px">── Eau Libre ──</option>
+                  <option value="5km">5km</option>
+                  <option value="7.5km">7,5km</option>
+                  <option value="10km">10km</option>
+                  <option value="Relais 4x1500m">Relais 4x1500m</option>
+                  <option value="KnockOut">KnockOut</option>
+                </select>
+              </div>
+              <div>
+                <label>Tour *</label>
+                <select id="ev-tour">
+                  <option value="auto">🔄 Automatique (selon type compét.)</option>
+                  <option value="serie">Série</option>
+                  <option value="demi-finale">Demi-finale</option>
+                  <option value="finale">Finale</option>
+                </select>
+                <div id="ev-tour-note" style="display:none;font-size:12px;color:var(--teal);padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface2)">🏁 Classement au temps</div>
+              </div>
+              <div><label>Date *</label><input type="date" id="ev-date"></div>
+              <div><label>Heure</label><input type="time" id="ev-heure"></div>
+              <div id="ev-engagement-wrap"><label>Temps engagement <small style="font-weight:400;color:var(--hint)">(référence)</small></label><input type="text" id="ev-engagement" placeholder="58.42"></div>
+              <div style="display:flex;align-items:flex-end">
+                <button class="btn btn-primary" style="width:100%" onclick="saveEvent()">+ Ajouter</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="section-header">
+              <div class="card-title">Programme enregistré <span id="events-count">0</span></div>
+              <button class="btn btn-sm" onclick="loadEvents()">↺</button>
+            </div>
+            <table class="data-table">
+              <thead><tr><th>Nageur</th><th>Épreuve</th><th>Tour</th><th>Date</th><th>Heure</th><th>T. engagement</th><th></th></tr></thead>
+              <tbody id="events-list"><tr><td colspan="7" class="empty">Aucune épreuve</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB : Import CSV -->
+        <div id="prog-tab-import" style="display:none">
+          <div class="card">
+            <div class="card-title">Import CSV du programme</div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:1rem">Format attendu (avec en-têtes) :</p>
+            <div style="background:var(--surface2);border-radius:6px;padding:10px 14px;font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);margin-bottom:1rem">
+              athlete_nom,athlete_prenom,epreuve,tour,date,heure,temps_engagement<br>
+              Dupont,Marie,100m Dos,serie,2025-07-15,09:30,1:02.34<br>
+              Martin,Jean,200m NL,finale,2025-07-16,19:00,1:48.20
+            </div>
+            <div class="csv-zone" onclick="document.getElementById('csvFile').click()">
+              <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+              <p>Cliquer pour sélectionner un fichier CSV</p>
+              <small>athlete_nom, athlete_prenom, epreuve, tour, date, heure, temps_engagement</small>
+            </div>
+            <input type="file" id="csvFile" accept=".csv" style="display:none" onchange="importCSV(event)">
+            <div id="csv-preview" style="margin-top:1rem;display:none">
+              <div style="font-size:13px;font-weight:500;margin-bottom:8px;color:var(--navy)" id="csv-preview-title"></div>
+              <table class="data-table" id="csv-preview-table"></table>
+              <div style="margin-top:1rem"><button class="btn btn-accent" onclick="confirmCSVImport()">✓ Importer ces épreuves</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ENTRAÎNEURS -->
+    <div class="page-section" id="section-coaches">
+      <div class="page-title">Entraîneurs</div>
+      <div class="page-sub">Profils réutilisables d'une compétition à l'autre.</div>
+
+      <div class="card">
+        <div class="card-title">Nouvel entraîneur</div>
+        <div class="form-grid">
+          <div><label>Prénom *</label><input type="text" id="co-prenom" placeholder="Marie"></div>
+          <div><label>Nom *</label><input type="text" id="co-nom" placeholder="Dupont"></div>
+          <div><label>Club / Structure</label><input type="text" id="co-club" placeholder="CN Antibes"></div>
+          <div><label>Email</label><input type="email" id="co-email" placeholder="m.dupont@cntibes.fr"></div>
+          <div><label>Rôle</label>
+            <select id="co-role">
+              <option value="entraineur">Entraîneur</option>
+              <option value="staff_responsable">★ Responsable d'équipe (Staff)</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:1rem"><button class="btn btn-primary" onclick="saveCoach()">+ Créer le profil</button></div>
+      </div>
+
+      <div class="card">
+        <div class="section-header">
+          <div class="card-title">Entraîneurs enregistrés <span id="coaches-count">0</span></div>
+          <button class="btn btn-sm" onclick="loadCoaches()">↺ Actualiser</button>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Nom</th><th>Club</th><th>Email</th><th>Rôle</th><th>Actions</th></tr></thead>
+          <tbody id="coaches-list"><tr><td colspan="4" class="empty">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- NAGEURS -->
+    <div class="page-section" id="section-athletes">
+      <div class="page-title">Nageurs</div>
+      <div class="page-sub">Profils réutilisables d'une compétition à l'autre.</div>
+
+      <div class="card">
+        <div class="card-title">Nouveau nageur</div>
+        <div class="form-grid">
+          <div><label>Prénom *</label><input type="text" id="at-prenom" placeholder="Thomas"></div>
+          <div><label>Nom *</label><input type="text" id="at-nom" placeholder="Martin"></div>
+          <div><label>Club</label><input type="text" id="at-club" placeholder="CN Marseille"></div>
+          <div><label>Discipline</label>
+            <select id="at-discipline">
+              <option>Natation</option><option>Eau Libre</option>
+              <option>Natation Artistique</option><option>Water-Polo</option><option>Plongeon</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:1rem"><button class="btn btn-primary" onclick="saveAthlete()">+ Créer le nageur</button></div>
+      </div>
+
+      <div class="card">
+        <div class="section-header">
+          <div class="card-title">Nageurs enregistrés <span id="athletes-count">0</span></div>
+          <button class="btn btn-sm" onclick="loadAthletes()">↺ Actualiser</button>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Nom</th><th>Club</th><th>Discipline</th><th>Actions</th></tr></thead>
+          <tbody id="athletes-list"><tr><td colspan="4" class="empty">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- NATIONS -->
+    <div class="page-section" id="section-nations">
+      <div class="page-title">Nations</div>
+      <div class="page-sub">Liste de référence partagée entre toutes les compétitions.</div>
+      <div class="card">
+        <div class="section-header">
+          <div class="card-title">Nations enregistrées <span id="nations-count">0</span></div>
+          <button class="btn btn-sm" onclick="loadNations()">↺</button>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Code</th><th>Nom</th></tr></thead>
+          <tbody id="nations-list"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://bpdxdljctybdmtemubjh.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwZHhkbGpjdHliZG10ZW11YmpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NzA2MTgsImV4cCI6MjA5NTU0NjYxOH0.b5GKWWTWTsrYPGmVPvexLWqAiQvkMl43Pzo96mz6lQw';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── MAPPING TOURS PAR TYPE DE COMPÉTITION ─────────────────────────
+const EPREUVES_SANS_ENGAGEMENT = ['5km','7.5km','10km','Relais 4x1500m','KnockOut'];
+
+const MAPPING_TOURS = {
+  // Types natation course avec structure bassin (série / demi-finale / finale)
+  CEJ: _mappingNatation(), CE: _mappingNatation(), CMJ: _mappingNatation(),
+  CM:  _mappingNatation(), JO: _mappingNatation(), CDM: _mappingNatation(),
+  // COMEN : classement au temps (une seule épreuve par course)
+  COMEN: _mappingTemps(),
+  // Eau libre
+  CEJ_EL: _mappingEauLibre(), EL_Senior: _mappingEauLibre(),
+};
+
+function _mappingNatation() {
+  return {
+    // 50m, 100m, 200m toutes nages : Série + DF J0, Finale J+1
+    courteDist: { tours: [['serie','demi-finale',0],['finale',1]] },
+    // 400m 4N : Série + Finale J0
+    moyenneDist: { tours: [['serie','finale',0]] },
+    // 800m, 1500m, relais : Série J0, Finale J+1
+    longueDist: { tours: [['serie',0],['finale',1]] },
+  };
+}
+function _mappingTemps() {
+  return {
+    // Toutes distances : classement final établi directement au temps
+    tempsUnique: { tours: [['finale',0]] },
+  };
+}
+function _mappingEauLibre() {
+  return {
+    // 5km, 7.5km, 10km, 4x1500 : Finale unique J0
+    unique: { tours: [['finale',0]] },
+    // KnockOut : Série + DF + Finale J0
+    knockout: { tours: [['serie','demi-finale','finale',0]] },
+  };
+}
+
+function getToursForEpreuve(epreuve, typeComp) {
+  // Retourne un tableau d'objets { tour, offset }
+
+  // COMEN : classement au temps — une seule épreuve par course (pas de série/DF/finale).
+  // Le tour 'finale' représente le classement final établi directement au temps.
+  if (typeComp === 'COMEN') {
+    return [{ tour:'finale', offset:0 }];
+  }
+
+  const courtes = ['50m','100m','200m'];
+  const moyennes = ['400m','200m 4 Nages','400m 4 Nages'];
+  const longues = ['800m','1500m','4x100m NL','4x200m NL','4x100m 4N','Relais 4x1500m'];
+  const eauLibreUnique = ['5km','7.5km','10km'];
+
+  if (epreuve === 'KnockOut') {
+    return [{ tour:'serie', offset:0 },{ tour:'demi-finale', offset:0 },{ tour:'finale', offset:0 }];
+  }
+  if (eauLibreUnique.some(e => epreuve.startsWith(e))) {
+    return [{ tour:'finale', offset:0 }];
+  }
+  // Natation course
+  if (courtes.some(d => epreuve.startsWith(d))) {
+    return [{ tour:'serie', offset:0 },{ tour:'demi-finale', offset:0 },{ tour:'finale', offset:1 }];
+  }
+  if (moyennes.some(d => epreuve === d || epreuve.startsWith('400m') || epreuve.startsWith('200m 4'))) {
+    return [{ tour:'serie', offset:0 },{ tour:'finale', offset:0 }];
+  }
+  if (longues.some(d => epreuve.startsWith(d.split(' ')[0]) || epreuve === d)) {
+    return [{ tour:'serie', offset:0 },{ tour:'finale', offset:1 }];
+  }
+  // Par défaut : série uniquement
+  return [{ tour:'serie', offset:0 }];
+}
+
+// ── STATE ──────────────────────────────────────────────
+let allCoaches = [], allAthletes = [], allCompetitions = [];
+let activeCompId = null;
+let csvParsed = [];
+
+// ── NAVIGATION ─────────────────────────────────────────
+function showSection(name) {
+  document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(s => s.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  document.querySelector(`[data-section="${name}"]`).classList.add('active');
+  if (name === 'programme') { loadCompSelectForProg(); }
+  if (name === 'nations') loadNations();
+}
+
+function showProgTab(tab) {
+  ['liaisons','epreuves','import'].forEach(t => {
+    document.getElementById('prog-tab-' + t).style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['liaisons','epreuves','import'][i] === tab);
+  });
+  if (tab === 'epreuves') loadEvents();
+  if (tab === 'liaisons') { loadCompCoaches(); loadCompAthletes(); }
+}
+
+// ── TOAST ───────────────────────────────────────────────
+function toast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (type === 'error' ? ' error' : '');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── COMPETITIONS ────────────────────────────────────────
+async function loadCompetitions() {
+  const { data, error } = await sb.from('competitions').select('*').order('date_debut', { ascending: false });
+  if (error) return toast('Erreur chargement compétitions', 'error');
+  allCompetitions = data || [];
+  document.getElementById('comp-count').textContent = allCompetitions.length;
+  const tbody = document.getElementById('comp-list');
+  if (!allCompetitions.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">Aucune compétition</td></tr>'; return; }
+  tbody.innerHTML = allCompetitions.map(c => `
+    <tr>
+      <td><strong>${c.nom}</strong>${c.type_competition ? `<span class="badge badge-blue" style="font-size:10px;margin-left:4px">${c.type_competition}</span>` : ''}</td>
+      <td>${c.lieu || '—'}${c.pays ? ', ' + c.pays : ''}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;line-height:1.8">
+        ${c.date_stage_debut ? `<span style="color:#6B3FA0">▪ Stage</span> ${fmtDate(c.date_stage_debut)}${c.date_stage_fin ? ' → '+fmtDate(c.date_stage_fin) : ''}<br>` : ''}
+        ${c.date_voyage_aller ? `<span style="color:var(--teal)">▪ Voyage</span> ${fmtDate(c.date_voyage_aller)}${c.date_voyage_retour ? ' → '+fmtDate(c.date_voyage_retour) : ''}<br>` : ''}
+        ${c.date_debut ? `<span style="color:var(--accent)">▪ Comp.</span> ${fmtDate(c.date_debut)}${c.date_fin ? ' → '+fmtDate(c.date_fin) : ''}<br>` : ''}
+        ${c.date_bilan ? `<span style="color:var(--success)">▪ Bilan</span> ${fmtDate(c.date_bilan)}` : ''}
+      </td>
+      <td>${badgeStatut(c.statut)}</td>
+      <td><div class="actions">
+        <button class="btn btn-sm" onclick="editCompetition('${c.id}')">✎ Modifier</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteCompetition('${c.id}')">✕</button>
+      </div></td>
+    </tr>`).join('');
+}
+
+async function saveCompetition() {
+  const nom = document.getElementById('c-nom').value.trim();
+  if (!nom) return toast('Le nom est requis', 'error');
+  const obj = {
+    nom, lieu: v('c-lieu'), pays: v('c-pays'), statut: v('c-statut'),
+    type_competition: v('c-type') || null,
+    date_stage_debut:  v('c-stage-debut')   || null,
+    date_stage_fin:    v('c-stage-fin')     || null,
+    date_voyage_aller: v('c-voyage-aller')  || null,
+    date_voyage_retour:v('c-voyage-retour') || null,
+    date_debut:        v('c-debut')         || null,
+    date_fin:          v('c-fin')           || null,
+    date_bilan:        v('c-bilan')         || null,
+  };
+  const { error } = await sb.from('competitions').insert(obj);
+  if (error) return toast('Erreur : ' + error.message, 'error');
+  toast('✓ Compétition créée');
+  ['c-nom','c-lieu','c-pays','c-type','c-stage-debut','c-stage-fin','c-voyage-aller','c-voyage-retour','c-debut','c-fin','c-bilan']
+    .forEach(id => document.getElementById(id).value = '');
+  loadCompetitions();
+}
+
+async function deleteCompetition(id) {
+  if (!confirm('Supprimer cette compétition et toutes ses données ?')) return;
+  const { error } = await sb.from('competitions').delete().eq('id', id);
+  if (error) return toast('Erreur', 'error');
+  toast('Compétition supprimée'); loadCompetitions();
+}
+
+// ── MODAL GÉNÉRIQUE D'ÉDITION ───────────────────────────
+let _editSaveHandler = null;
+function openEditModal(title, id, fieldsHtml, saveHandler) {
+  document.getElementById('edit-modal-title').textContent = title;
+  document.getElementById('edit-entity-id').value = id;
+  document.getElementById('edit-modal-fields').innerHTML = fieldsHtml;
+  _editSaveHandler = saveHandler;
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+  _editSaveHandler = null;
+}
+async function submitEditModal() {
+  if (_editSaveHandler) await _editSaveHandler(document.getElementById('edit-entity-id').value);
+}
+// Lecture d'un champ du modal
+function ev_(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+// Échappe les valeurs pour les attributs HTML
+function esc(s) { return String(s == null ? '' : s).replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+async function editCompetition(id) {
+  const c = allCompetitions.find(x => x.id === id);
+  if (!c) return;
+
+  const typeOpts = [
+    ['', '— Non défini —'],
+    ['__grp', 'Natation Course'],
+    ['CEJ',"CEJ — Championnats d'Europe Juniors"],['CE',"CE — Championnats d'Europe"],
+    ['CMJ',"CMJ — Championnats du Monde Juniors"],['CM',"CM — Championnats du Monde"],
+    ['JO',"JO — Jeux Olympiques"],['CDM',"CDM — Coupe du Monde"],['COMEN','COMEN'],
+    ['__grp','Eau Libre'],
+    ['CEJ_EL','CEJ/CMJ Eau Libre'],['EL_Senior','EL Senior'],
+  ].map(([val,lbl]) => val === '__grp'
+      ? `<option disabled style="color:var(--hint)">── ${lbl} ──</option>`
+      : `<option value="${val}" ${c.type_competition === val ? 'selected' : ''}>${lbl}</option>`).join('');
+
+  const statutOpts = [['preparation','En préparation'],['en_cours','En cours'],['terminee','Terminée']]
+    .map(([val,lbl]) => `<option value="${val}" ${c.statut === val ? 'selected' : ''}>${lbl}</option>`).join('');
+
+  const dateFields = [
+    ['edit-c-stage-debut','Stage début','date_stage_debut'],['edit-c-stage-fin','Stage fin','date_stage_fin'],
+    ['edit-c-voyage-aller','Voyage aller','date_voyage_aller'],['edit-c-voyage-retour','Voyage retour','date_voyage_retour'],
+    ['edit-c-debut','Compétition début','date_debut'],['edit-c-fin','Compétition fin','date_fin'],
+    ['edit-c-bilan','Bilan','date_bilan'],
+  ].map(([fid,lbl,key]) => `<div><label style="font-size:12px;color:var(--muted)">${lbl}</label>
+      <input type="date" id="${fid}" value="${c[key] || ''}" style="font-size:12px;padding:5px 7px"></div>`).join('');
+
+  const html = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div><label>Nom *</label><input type="text" id="edit-c-nom" value="${esc(c.nom)}"></div>
+      <div><label>Lieu</label><input type="text" id="edit-c-lieu" value="${esc(c.lieu)}"></div>
+      <div><label>Type de compétition</label><select id="edit-c-type">${typeOpts}</select></div>
+      <div><label>Pays</label><input type="text" id="edit-c-pays" value="${esc(c.pays)}"></div>
+      <div><label>Statut</label><select id="edit-c-statut">${statutOpts}</select></div>
+    </div>
+    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Calendrier des phases</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${dateFields}</div>`;
+
+  openEditModal('Modifier la compétition', id, html, saveEditCompetition);
+}
+
+async function saveEditCompetition(id) {
+  const nom = ev_('edit-c-nom');
+  if (!nom) return toast('Le nom est requis', 'error');
+  const obj = {
+    nom, lieu: ev_('edit-c-lieu') || null, pays: ev_('edit-c-pays') || null,
+    statut: ev_('edit-c-statut') || null, type_competition: ev_('edit-c-type') || null,
+    date_stage_debut:   ev_('edit-c-stage-debut')   || null,
+    date_stage_fin:     ev_('edit-c-stage-fin')     || null,
+    date_voyage_aller:  ev_('edit-c-voyage-aller')  || null,
+    date_voyage_retour: ev_('edit-c-voyage-retour') || null,
+    date_debut:         ev_('edit-c-debut')         || null,
+    date_fin:           ev_('edit-c-fin')           || null,
+    date_bilan:         ev_('edit-c-bilan')         || null,
+  };
+  const { error } = await sb.from('competitions').update(obj).eq('id', id);
+  if (error) return toast('Erreur : ' + error.message, 'error');
+  toast('✓ Compétition mise à jour');
+  closeEditModal();
+  loadCompetitions();
+}
+
+// ── COACHES ─────────────────────────────────────────────
+async function loadCoaches() {
+  const { data, error } = await sb.from('coaches').select('*').order('nom');
+  if (error) return toast('Erreur', 'error');
+  allCoaches = data || [];
+  document.getElementById('coaches-count').textContent = allCoaches.length;
+  const tbody = document.getElementById('coaches-list');
+  if (!allCoaches.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">Aucun entraîneur</td></tr>'; return; }
+  tbody.innerHTML = allCoaches.map(c => `
+    <tr>
+      <td><strong>${c.prenom} ${c.nom}</strong></td>
+      <td>${c.club || '—'}</td>
+      <td style="font-size:12px;color:var(--muted)">${c.email || '—'}</td>
+      <td>${c.role === 'staff_responsable' ? '<span class="badge badge-blue">★ Staff</span>' : '<span class="badge badge-gray">Entraîneur</span>'}</td>
+      <td><div class="actions">
+        <button class="btn btn-sm" onclick="editCoach('${c.id}')">✎ Modifier</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteCoach('${c.id}')">✕</button>
+      </div></td>
+    </tr>`).join('');
+  refreshCoachSelects();
+}
+
+async function saveCoach() {
+  const prenom = v('co-prenom'), nom = v('co-nom');
+  if (!prenom || !nom) return toast('Prénom et nom requis', 'error');
+  const { error } = await sb.from('coaches').insert({ prenom, nom, club: v('co-club'), email: v('co-email'), role: v('co-role') || 'entraineur' });
+  if (error) return toast('Erreur : ' + error.message, 'error');
+  toast('✓ Entraîneur créé');
+  ['co-prenom','co-nom','co-club','co-email'].forEach(id => document.getElementById(id).value = '');
+  loadCoaches();
+}
+
+async function editCoach(id) {
+  const c = allCoaches.find(x => x.id === id);
+  if (!c) return;
+  const roleOpts = [['entraineur','Entraîneur'],['staff_responsable',"★ Responsable d'équipe (Staff)"]]
+    .map(([val,lbl]) => `<option value="${val}" ${c.role === val ? 'selected' : ''}>${lbl}</option>`).join('');
+  const html = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label>Prénom *</label><input type="text" id="edit-co-prenom" value="${esc(c.prenom)}"></div>
+      <div><label>Nom *</label><input type="text" id="edit-co-nom" value="${esc(c.nom)}"></div>
+      <div><label>Club / Structure</label><input type="text" id="edit-co-club" value="${esc(c.club)}"></div>
+      <div><label>Email</label><input type="email" id="edit-co-email" value="${esc(c.email)}"></div>
+      <div style="grid-column:1/-1"><label>Rôle</label><select id="edit-co-role">${roleOpts}</select></div>
+    </div>`;
+  openEditModal('Modifier l\'entraîneur', id, html, saveEditCoach);
+}
+
+async function saveEditCoach(id) {
+  const prenom = ev_('edit-co-prenom'), nom = ev_('edit-co-nom');
+  if (!prenom || !nom) return toast('Prénom et nom requis', 'error');
+  const { error } = await sb.from('coaches').update({
+    prenom, nom, club: ev_('edit-co-club') || null, email: ev_('edit-co-email') || null,
+    role: ev_('edit-co-role') || 'entraineur'
+  }).eq('id', id);
+  if (error) return toast('Erreur : ' + error.message, 'error');
+  toast('✓ Entraîneur mis à jour');
+  closeEditModal();
+  loadCoaches();
+}
+
+async function deleteCoach(id) {
+  if (!confirm('Supprimer cet entraîneur ?')) return;
+  await sb.from('coaches').delete().eq('id', id);
+  toast('Supprimé'); loadCoaches();
+}
+
+// ── ATHLETES ────────────────────────────────────────────
+async function loadAthletes() {
+  const { data, error } = await sb.from('athletes').select('*').order('nom');
+  if (error) return toast('Erreur', 'error');
+  allAthletes = data || [];
+  document.getElementById('athletes-count').textContent = allAthletes.length;
+  const tbody = document.getElementById('athletes-list');
+  if (!allAthletes.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">Aucun nageur</td></tr>'; return; }
+  tbody.innerHTML = allAthletes.map(a => `
+    <tr>
+      <td><strong>${a.prenom} ${a.nom}</strong></td>
+      <td>${a.club || '—'}</td>
+      <td><span class="badge badge-blue">${a.discipline}</span></td>
+      <td><div class="actions">
+        <button class="btn btn-sm" onclick="editAthlete('${a.id}')">✎ Modifier</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteAthlete('${a.id}')">✕</button>
+      </div></td>
+    </tr>`).join('');
+  refreshAthleteSelects();
+}
+
+async function saveAthlete() {
+  const prenom = v('at-prenom'), nom = v('at-nom');
+  if (!prenom || !nom) return toast('Prénom et nom requis', 'error');
+  const { error } = await sb.from('athletes').insert({ prenom, nom, club: v('at-club'), discipline: v('at-discipline') });
+  if (error) return toast('Erreur : ' + error.message, 'error');
+  toast('✓ Nageur créé');
+  ['at-prenom','at-nom','at-club'].forEach(id => document.getElementById(id).value = '');
+  loadAthletes();
+}
+
+async function editAthlete(id) {
+  const a = allAthletes.find(x => x.id === id);
+  if (!a) return;
+  const disciplines = ['Natation','Eau Libre','Natation Artistique','Water-Polo','Plongeon'];
+  const discOpts = disciplines.map(d => `<option ${a.discipline === d ? 'selected' : ''}>${d}</option>`).join('');
+  const html = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label>Prénom *</label><input type="text" id="edit-at-prenom" value="${esc(a.prenom)}"></div>
+      <div><label>Nom *</label><input type="text" id="edit-at-nom" value="${esc(a.nom)}"></div>
+      <div><label>Club</label><input type="text" id="edit-at-club" value="${esc(a.club)}"></div>
+      <div><label>Discipline</label><select id="edit-at-discipline">${discOpts}</select></div>
+    </div>`;
+  openEditModal('Modifier le nageur', id, html, saveEditAthlete);
+}
+
+async function saveEditAthlete(id) {
+  const prenom = ev_('edit-at-prenom'), nom = ev_('edit-at-nom');
+  if (!prenom || !nom) return toast('Prénom et nom requis', 'error');
+  const { error } = await sb.from('athletes').update({
+    prenom, nom, club: ev_('edit-at-club') || null, discipline: ev_('edit-at-discipline')
+  }).eq('id', id);
+  if (error) return toast('Erreur : ' + error.message, 'error');
+  toast('✓ Nageur mis à jour');
+  closeEditModal();
+  loadAthletes();
+}
+
+async function deleteAthlete(id) {
+  if (!confirm('Supprimer ce nageur ?')) return;
+  await sb.from('athletes').delete().eq('id', id);
+  toast('Supprimé'); loadAthletes();
+}
+
+// ── NATIONS ─────────────────────────────────────────────
+async function loadNations() {
+  const { data } = await sb.from('nations').select('*').order('nom');
+  const tbody = document.getElementById('nations-list');
+  document.getElementById('nations-count').textContent = (data || []).length;
+  tbody.innerHTML = (data || []).map(n => `<tr><td><span class="badge badge-gray" style="font-family:'DM Mono',monospace">${n.code}</span></td><td>${n.nom}</td></tr>`).join('');
+}
+
+// ── PROGRAMME : sélecteur compétition ──────────────────
+async function loadCompSelectForProg() {
+  await loadCompetitions();
+  const sel = document.getElementById('prog-comp-select');
+  sel.innerHTML = '<option value="">— Choisir une compétition —</option>' +
+    allCompetitions.map(c => `<option value="${c.id}">${c.nom}</option>`).join('');
+}
+
+function onProgCompChange() {
+  activeCompId = document.getElementById('prog-comp-select').value;
+  document.getElementById('prog-content').style.display = activeCompId ? '' : 'none';
+  if (activeCompId) { loadCompCoaches(); loadCompAthletes(); }
+  applyCompTypeToEventForm();
+}
+
+// Adapte le formulaire d'épreuve selon le type de la compétition active.
+// COMEN = classement au temps : on masque le sélecteur de tour et on force 'finale'.
+function applyCompTypeToEventForm() {
+  const comp = allCompetitions.find(c => c.id === activeCompId);
+  const tourSel = document.getElementById('ev-tour');
+  const note = document.getElementById('ev-tour-note');
+  if (!tourSel) return;
+  if (comp && comp.type_competition === 'COMEN') {
+    tourSel.value = 'finale';   // classement au temps = une seule finale
+    tourSel.style.display = 'none';
+    if (note) note.style.display = '';
+  } else {
+    tourSel.style.display = '';
+    if (note) note.style.display = 'none';
+  }
+}
+
+// ── LIAISONS entraîneur / compétition ──────────────────
+async function loadCompCoaches() {
+  if (!activeCompId) return;
+  const { data } = await sb.from('competition_coaches').select('*, coaches(*)').eq('competition_id', activeCompId);
+  const list = document.getElementById('comp-coaches-list');
+  if (!data || !data.length) { list.innerHTML = '<div class="empty" style="padding:8px">Aucun entraîneur associé</div>'; return; }
+  list.innerHTML = data.map(r => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:13px">${r.coaches.prenom} ${r.coaches.nom}</span>
+      <button class="btn btn-sm btn-danger" onclick="removeCoachFromComp('${r.id}')">✕</button>
+    </div>`).join('');
+  // Update athlete coach select
+  const acs = document.getElementById('add-athlete-coach');
+  acs.innerHTML = '<option value="">— Entraîneur référent —</option>' +
+    data.map(r => `<option value="${r.coaches.id}">${r.coaches.prenom} ${r.coaches.nom}</option>`).join('');
+}
+
+async function addCoachToComp() {
+  const coach_id = document.getElementById('add-coach-select').value;
+  if (!coach_id || !activeCompId) return toast('Sélectionner un entraîneur', 'error');
+  const { error } = await sb.from('competition_coaches').insert({ competition_id: activeCompId, coach_id });
+  if (error) return toast(error.code === '23505' ? 'Déjà associé' : error.message, 'error');
+  toast('✓ Entraîneur associé'); loadCompCoaches();
+}
+
+async function removeCoachFromComp(id) {
+  await sb.from('competition_coaches').delete().eq('id', id);
+  toast('Retiré'); loadCompCoaches();
+}
+
+async function loadCompAthletes() {
+  if (!activeCompId) return;
+  const { data } = await sb.from('competition_athletes').select('*, athletes(*), coaches(*)').eq('competition_id', activeCompId);
+  const list = document.getElementById('comp-athletes-list');
+  const evSel = document.getElementById('ev-athlete');
+  if (!data || !data.length) {
+    list.innerHTML = '<div class="empty" style="padding:8px">Aucun nageur associé</div>';
+    evSel.innerHTML = '<option value="">—</option>';
+    return;
+  }
+  list.innerHTML = data.map(r => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <span style="font-size:13px">${r.athletes.prenom} ${r.athletes.nom}</span>
+        ${r.coaches ? `<span style="font-size:11px;color:var(--muted);margin-left:6px">— ${r.coaches.prenom} ${r.coaches.nom}</span>` : ''}
+      </div>
+      <button class="btn btn-sm btn-danger" onclick="removeAthleteFromComp('${r.id}')">✕</button>
+    </div>`).join('');
+  evSel.innerHTML = '<option value="">—</option>' +
+    data.map(r => `<option value="${r.athlete_id}">${r.athletes.prenom} ${r.athletes.nom}</option>`).join('');
+}
+
+async function addAthleteToComp() {
+  const athlete_id = document.getElementById('add-athlete-select').value;
+  const coach_id = document.getElementById('add-athlete-coach').value || null;
+  if (!athlete_id || !activeCompId) return toast('Sélectionner un nageur', 'error');
+  const { error } = await sb.from('competition_athletes').insert({ competition_id: activeCompId, athlete_id, coach_id });
+  if (error) return toast(error.code === '23505' ? 'Déjà associé' : error.message, 'error');
+  toast('✓ Nageur associé'); loadCompAthletes();
+}
+
+async function removeAthleteFromComp(id) {
+  await sb.from('competition_athletes').delete().eq('id', id);
+  toast('Retiré'); loadCompAthletes();
+}
+
+// ── EVENTS ──────────────────────────────────────────────
+async function loadEvents() {
+  if (!activeCompId) return;
+  applyCompTypeToEventForm();
+  const { data } = await sb.from('events').select('*, athletes(*)').eq('competition_id', activeCompId).order('date_epreuve').order('heure');
+  document.getElementById('events-count').textContent = (data || []).length;
+  const tbody = document.getElementById('events-list');
+  if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">Aucune épreuve</td></tr>'; return; }
+  tbody.innerHTML = data.map(e => `
+    <tr>
+      <td>${e.athletes.prenom} ${e.athletes.nom}</td>
+      <td>${e.epreuve}</td>
+      <td>${badgeTour(e.tour)}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px">${fmtDate(e.date_epreuve)}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px">${e.heure || '—'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${e.temps_engagement || '—'}</td>
+      <td><div class="actions">
+        <button class="btn btn-sm" onclick="editEvent('${e.id}')">✎</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteEvent('${e.id}')">✕</button>
+      </div></td>
+    </tr>`).join('');
+}
+
+async function saveEvent() {
+  const athlete_id = v('ev-athlete'), epreuve = v('ev-epreuve'), date_epreuve = v('ev-date');
+  if (!athlete_id || !epreuve || !date_epreuve) return toast('Nageur, épreuve et date requis', 'error');
+
+  const comp = allCompetitions.find(c => c.id === activeCompId);
+  const typeComp = comp?.type_competition;
+  const manualTour = v('ev-tour');
+  const engagement = EPREUVES_SANS_ENGAGEMENT.includes(epreuve) ? null : (v('ev-engagement') || null);
+
+  // Si un type de compétition est défini, générer les tours automatiquement
+  if (typeComp && manualTour === 'auto') {
+    const tours = getToursForEpreuve(epreuve, typeComp);
+    const baseDate = new Date(date_epreuve);
+    let ok = 0;
+    for (const t of tours) {
+      const d = new Date(baseDate);
+      d.setDate(d.getDate() + t.offset);
+      const dateStr = d.toISOString().split('T')[0];
+      const { error } = await sb.from('events').insert({
+        competition_id: activeCompId, athlete_id, epreuve,
+        tour: t.tour, date_epreuve: dateStr,
+        heure: v('ev-heure') || null, temps_engagement: engagement
+      });
+      if (!error) ok++;
+    }
+    toast(`✓ ${ok} épreuve(s) créée(s) automatiquement`);
+  } else {
+    // Mode manuel : un seul tour
+    const { error } = await sb.from('events').insert({
+      competition_id: activeCompId, athlete_id, epreuve,
+      tour: manualTour, date_epreuve,
+      heure: v('ev-heure') || null, temps_engagement: engagement
+    });
+    if (error) return toast('Erreur : ' + error.message, 'error');
+    toast('✓ Épreuve ajoutée');
+  }
+  loadEvents();
+}
+
+async function editEvent(id) {
+  const { data: e } = await sb.from('events').select('*, athletes(*)').eq('id', id).single();
+  if (!e) return toast('Épreuve introuvable', 'error');
+
+  const comp = allCompetitions.find(c => c.id === activeCompId);
+  const isComen = comp && comp.type_competition === 'COMEN';
+
+  const epreuveOpts = document.getElementById('ev-epreuve').innerHTML; // réutilise la liste d'épreuves
+  // COMEN : classement au temps => seul le tour 'finale' est proposé
+  const tourList = isComen ? [['finale','🏁 Classement au temps']] : [['serie','Série'],['demi-finale','Demi-finale'],['finale','Finale']];
+  const tourOpts = tourList
+    .map(([val,lbl]) => `<option value="${val}" ${(isComen ? 'finale' : e.tour) === val ? 'selected' : ''}>${lbl}</option>`).join('');
+  const sansEng = EPREUVES_SANS_ENGAGEMENT.includes(e.epreuve);
+
+  const html = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Nageur : <strong style="color:var(--navy)">${e.athletes ? e.athletes.prenom + ' ' + e.athletes.nom : '—'}</strong></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="grid-column:1/-1"><label>Épreuve *</label><select id="edit-ev-epreuve" onchange="onEditEpreuveChange()">${epreuveOpts}</select></div>
+      <div><label>Tour *</label><select id="edit-ev-tour" ${isComen ? 'disabled' : ''}>${tourOpts}</select></div>
+      <div><label>Date *</label><input type="date" id="edit-ev-date" value="${e.date_epreuve || ''}"></div>
+      <div><label>Heure</label><input type="time" id="edit-ev-heure" value="${e.heure || ''}"></div>
+      <div id="edit-ev-engagement-wrap" style="${sansEng ? 'display:none' : ''}"><label>Temps engagement</label><input type="text" id="edit-ev-engagement" value="${esc(e.temps_engagement)}" placeholder="58.42"></div>
+    </div>`;
+
+  openEditModal('Modifier l\'épreuve', id, html, saveEditEvent);
+  document.getElementById('edit-ev-epreuve').value = e.epreuve; // sélectionner la valeur courante
+}
+
+function onEditEpreuveChange() {
+  const epreuve = document.getElementById('edit-ev-epreuve').value;
+  const wrap = document.getElementById('edit-ev-engagement-wrap');
+  if (!wrap) return;
+  const sansEng = EPREUVES_SANS_ENGAGEMENT.includes(epreuve);
+  wrap.style.display = sansEng ? 'none' : '';
+  if (sansEng) document.getElementById('edit-ev-engagement').value = '';
+}
+
+async function saveEditEvent(id) {
+  const epreuve = ev_('edit-ev-epreuve'), date_epreuve = ev_('edit-ev-date');
+  if (!epreuve || !date_epreuve) return toast('Épreuve et date requis', 'error');
+  const engagement = EPREUVES_SANS_ENGAGEMENT.includes(epreuve) ? null : (ev_('edit-ev-engagement') || null);
+  const { error } = await sb.from('events').update({
+    epreuve, tour: ev_('edit-ev-tour'), date_epreuve,
+    heure: ev_('edit-ev-heure') || null, temps_engagement: engagement
+  }).eq('id', id);
+  if (error) return toast('Erreur : ' + error.message, 'error');
+  toast('✓ Épreuve mise à jour');
+  closeEditModal();
+  loadEvents();
+}
+
+async function deleteEvent(id) {
+  await sb.from('events').delete().eq('id', id);
+  toast('Supprimée'); loadEvents();
+}
+
+// ── CSV IMPORT ───────────────────────────────────────────
+function importCSV(evt) {
+  const file = evt.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const lines = e.target.result.split('\n').filter(l => l.trim());
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    csvParsed = lines.slice(1).map(line => {
+      const vals = line.split(',').map(v => v.trim());
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = vals[i] || '');
+      return obj;
+    }).filter(r => r.athlete_nom);
+
+    const preview = document.getElementById('csv-preview');
+    document.getElementById('csv-preview-title').textContent = `${csvParsed.length} épreuve(s) détectée(s)`;
+    const tbl = document.getElementById('csv-preview-table');
+    tbl.innerHTML = `<thead><tr><th>Nageur</th><th>Épreuve</th><th>Tour</th><th>Date</th><th>Heure</th></tr></thead>
+      <tbody>${csvParsed.slice(0,10).map(r => `<tr><td>${r.athlete_prenom||''} ${r.athlete_nom}</td><td>${r.epreuve}</td><td>${r.tour}</td><td>${r.date}</td><td>${r.heure||'—'}</td></tr>`).join('')}
+      ${csvParsed.length > 10 ? `<tr><td colspan="5" class="empty">… et ${csvParsed.length - 10} autres</td></tr>` : ''}</tbody>`;
+    preview.style.display = '';
+  };
+  reader.readAsText(file);
+}
+
+async function confirmCSVImport() {
+  if (!activeCompId || !csvParsed.length) return;
+  let ok = 0, skip = 0;
+  for (const row of csvParsed) {
+    // Trouver le nageur
+    const athlete = allAthletes.find(a => a.nom.toLowerCase() === (row.athlete_nom||'').toLowerCase() && a.prenom.toLowerCase() === (row.athlete_prenom||'').toLowerCase());
+    if (!athlete) { skip++; continue; }
+    const { error } = await sb.from('events').insert({
+      competition_id: activeCompId, athlete_id: athlete.id,
+      epreuve: row.epreuve, tour: row.tour || 'serie',
+      date_epreuve: row.date, heure: row.heure || null,
+      temps_engagement: row.temps_engagement || null
+    });
+    if (!error) ok++; else skip++;
+  }
+  toast(`✓ ${ok} épreuve(s) importée(s)${skip > 0 ? ` — ${skip} ignorée(s)` : ''}`);
+  document.getElementById('csv-preview').style.display = 'none';
+  loadEvents();
+}
+
+function onEpreuveChange() {
+  const epreuve = document.getElementById('ev-epreuve').value;
+  const wrap = document.getElementById('ev-engagement-wrap');
+  if (EPREUVES_SANS_ENGAGEMENT.includes(epreuve)) {
+    wrap.style.display = 'none';
+    document.getElementById('ev-engagement').value = '';
+  } else {
+    wrap.style.display = '';
+  }
+}
+
+// ── HELPERS ─────────────────────────────────────────────
+function v(id) { return document.getElementById(id)?.value?.trim() || ''; }
+function fmtDate(d) { if (!d) return '—'; const p = d.split('-'); return p[2]+'/'+p[1]+'/'+p[0].slice(2); }
+function badgeStatut(s) {
+  const map = { preparation: ['badge-gray','En préparation'], en_cours: ['badge-green','En cours'], terminee: ['badge-blue','Terminée'] };
+  const [cls, label] = map[s] || ['badge-gray', s];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+function badgeTour(t) {
+  const map = { serie: 'badge-gray', 'demi-finale': 'badge-orange', finale: 'badge-green' };
+  return `<span class="badge ${map[t]||'badge-gray'}">${t}</span>`;
+}
+function refreshCoachSelects() {
+  const sel = document.getElementById('add-coach-select');
+  if (sel) sel.innerHTML = '<option value="">— Sélectionner —</option>' + allCoaches.map(c => `<option value="${c.id}">${c.prenom} ${c.nom}</option>`).join('');
+}
+function refreshAthleteSelects() {
+  const sel = document.getElementById('add-athlete-select');
+  if (sel) sel.innerHTML = '<option value="">— Sélectionner —</option>' + allAthletes.map(a => `<option value="${a.id}">${a.prenom} ${a.nom}</option>`).join('');
+}
+
+// ── INIT ────────────────────────────────────────────────
+loadCompetitions();
+loadCoaches();
+loadAthletes();
+</script>
+
+<!-- MODAL D'ÉDITION GÉNÉRIQUE -->
+<div id="edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border-radius:12px;padding:24px;min-width:480px;max-width:90vw;max-height:90vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="font-weight:600;color:var(--navy);margin-bottom:16px;font-size:15px" id="edit-modal-title">Modifier</div>
+    <input type="hidden" id="edit-entity-id">
+    <div id="edit-modal-fields"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+      <button class="btn" onclick="closeEditModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="submitEditModal()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
