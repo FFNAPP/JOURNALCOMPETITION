@@ -1426,7 +1426,22 @@ async function initSetup() {
     ind.textContent = 'Profil Entraîneur — journal de bord';
   }
 
-  const { data: comps } = await sb.from('competitions').select('*').order('date_debut', { ascending: false });
+  let comps;
+  if (myRole === 'dtn') {
+    const { data } = await sb.from('competitions').select('*').order('date_debut', { ascending: false });
+    comps = data;
+  } else {
+    // Entraîneur : uniquement les compétitions auxquelles il a été associé
+    const { data: links } = await sb
+      .from('competition_athletes')
+      .select('competition_id, competitions(*)')
+      .eq('coach_id', myCoachId);
+    const seen = new Set();
+    comps = (links || [])
+      .map(l => l.competitions)
+      .filter(c => c && !seen.has(c.id) && seen.add(c.id))
+      .sort((a, b) => b.date_debut?.localeCompare(a.date_debut || '') || 0);
+  }
   const sel = document.getElementById('setup-comp');
   (comps || []).forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.nom; sel.appendChild(o); });
   const { data: nations } = await sb.from('nations').select('*').order('nom');
@@ -1540,8 +1555,17 @@ async function loadDayData(date) {
       existingStaffId = data?.id || null;
       fillStaffForm(data);
     } else {
-      const { data: events } = await sb.from('events').select('*, athletes(*)').eq('competition_id', activeCompId).eq('date_epreuve', date).order('heure');
-      currentEvents = events || [];
+      // Récupérer uniquement les nageurs associés à cet entraîneur pour cette compétition
+      const { data: myLinks } = await sb
+        .from('competition_athletes')
+        .select('athlete_id')
+        .eq('competition_id', activeCompId)
+        .eq('coach_id', activeCoachId);
+      const myAthleteIds = (myLinks || []).map(l => l.athlete_id);
+      let eventsQuery = sb.from('events').select('*, athletes(*)').eq('competition_id', activeCompId).eq('date_epreuve', date).order('heure');
+      if (myAthleteIds.length) eventsQuery = eventsQuery.in('athlete_id', myAthleteIds);
+      const { data: events } = await eventsQuery;
+      currentEvents = myAthleteIds.length ? (events || []) : [];
       const { data: existingResults } = await sb.from('results').select('*').eq('competition_id', activeCompId).eq('coach_id', activeCoachId).in('event_id', currentEvents.map(e => e.id));
       resultStates = {};
       (existingResults || []).forEach(r => { resultStates[r.event_id] = { id: r.id, a_nage: r.a_nage, temps: r.temps, rang: r.rang, observations: r.observations }; });
