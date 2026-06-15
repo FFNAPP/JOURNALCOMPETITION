@@ -509,6 +509,13 @@
           <tbody id="results-tbody"></tbody>
         </table>
         <div style="font-size:12px;color:var(--hint)">Le programme est pré-rempli depuis les épreuves du jour.</div>
+
+        <!-- SECTION RELAIS -->
+        <div id="relay-section" style="display:none;margin-top:20px">
+          <div style="font-weight:600;color:var(--navy);font-size:14px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid var(--border)">Relais</div>
+          <div id="relay-blocks"></div>
+        </div>
+
         <div>
           <label>Gestion des émotions et du stress</label>
           <textarea id="gestion-emotions" placeholder="Comment ai-je accompagné mes nageurs avant et après course ? Qu'est-ce qui a bien fonctionné ?"></textarea>
@@ -1570,6 +1577,7 @@ async function loadDayData(date) {
       resultStates = {};
       (existingResults || []).forEach(r => { resultStates[r.event_id] = { id: r.id, a_nage: r.a_nage, temps: r.temps, rang: r.rang, observations: r.observations }; });
       renderResultsTable();
+      loadRelaySection();
       const { data: journal } = await sb.from('journal_entries').select('*').eq('competition_id', activeCompId).eq('coach_id', activeCoachId).eq('date_entree', date).maybeSingle();
       existingJournalId = journal?.id || null;
       fillJournalForm(journal);
@@ -1738,6 +1746,72 @@ function setResult(eid, f, val) {
       }
     }
   }
+}
+
+// ── RELAIS ──────────────────────────────────────────────────
+async function loadRelaySection() {
+  if (!activeCompId || !activeCoachId) return;
+  const { data: relays, error } = await sb
+    .from('relay_events')
+    .select('*, relay_athletes(position, athletes(id, prenom, nom)), relay_results(id, temps_final, rang, relay_splits(athlete_id, position, temps_passage))')
+    .eq('competition_id', activeCompId)
+    .eq('coach_id', activeCoachId)
+    .order('date_epreuve');
+  if (error) return;
+  const section = document.getElementById('relay-section');
+  const container = document.getElementById('relay-blocks');
+  if (!relays || !relays.length) { if (section) section.style.display = 'none'; return; }
+  section.style.display = '';
+  container.innerHTML = relays.map(r => {
+    const athletes = (r.relay_athletes || []).slice().sort((a,b) => a.position - b.position);
+    const result = (r.relay_results || [])[0] || null;
+    const splitsMap = {};
+    (result?.relay_splits || []).forEach(s => { splitsMap[s.position] = s.temps_passage; });
+    const tempsEng = r.temps_engagement ? `<div style="font-size:12px;color:var(--hint);margin-bottom:10px">Temps d'engagement : <span style="font-family:'DM Mono',monospace">${r.temps_engagement}</span></div>` : '';
+    const mdate = r.date_epreuve ? r.date_epreuve.split('-') : null;
+    const dateStr = mdate ? mdate[2]+'/'+mdate[1]+'/'+mdate[0].slice(2) : '';
+    return `<div style="border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px">
+      <div style="font-weight:600;color:var(--navy);margin-bottom:4px">${r.type_relais} — ${r.tour} ${dateStr ? '— '+dateStr : ''}</div>
+      ${tempsEng}
+      <div style="margin-bottom:10px">
+        <div style="font-size:12px;font-weight:500;color:var(--muted);margin-bottom:6px">Résultat de l'équipe</div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div><label style="font-size:12px">Temps final</label><input type="text" id="relay-temps-final-${r.id}" value="${result?.temps_final || ''}" placeholder="3:45.12" style="width:90px;margin-left:6px"></div>
+          <div><label style="font-size:12px">Rang</label><input type="number" id="relay-rang-${r.id}" value="${result?.rang || ''}" placeholder="1" min="1" style="width:55px;margin-left:6px"></div>
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:12px;font-weight:500;color:var(--muted);margin-bottom:6px">Temps de passage</div>
+        ${athletes.map(a => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-size:12px;min-width:130px">${a.position}. ${a.athletes.prenom} ${a.athletes.nom}</span>
+          <input type="text" id="relay-split-${r.id}-${a.position}" value="${splitsMap[a.position] || ''}" placeholder="58.42" style="width:80px">
+        </div>`).join('')}
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="saveRelayResult('${r.id}', ${JSON.stringify(athletes.map(a => ({athlete_id: a.athletes.id, position: a.position})))})">Enregistrer</button>
+    </div>`;
+  }).join('');
+}
+
+async function saveRelayResult(relayEventId, athletes) {
+  const tempsFinal = (document.getElementById('relay-temps-final-'+relayEventId)?.value || '').trim() || null;
+  const rang       = parseInt(document.getElementById('relay-rang-'+relayEventId)?.value) || null;
+
+  const { data: result, error: e1 } = await sb.from('relay_results')
+    .upsert({ relay_event_id: relayEventId, coach_id: activeCoachId, temps_final: tempsFinal, rang }, { onConflict: 'relay_event_id,coach_id' })
+    .select().single();
+  if (e1) { toast('Erreur : ' + e1.message, 'error'); return; }
+
+  const splitsPayload = athletes.map(a => ({
+    relay_result_id: result.id,
+    coach_id:        activeCoachId,
+    athlete_id:      a.athlete_id,
+    position:        a.position,
+    temps_passage:   (document.getElementById('relay-split-'+relayEventId+'-'+a.position)?.value || '').trim() || null
+  }));
+  const { error: e2 } = await sb.from('relay_splits').upsert(splitsPayload, { onConflict: 'relay_result_id,position' });
+  if (e2) { toast('Erreur splits : ' + e2.message, 'error'); return; }
+
+  toast('✓ Relais enregistré', 'success');
 }
 
 // ── NON-COMPÉTITEURS ────────────────────────────────────────

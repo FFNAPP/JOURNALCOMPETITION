@@ -473,6 +473,16 @@
               <tbody id="events-list"><tr><td colspan="8" class="empty">Aucune épreuve</td></tr></tbody>
             </table>
           </div>
+          <div class="card">
+            <div class="section-header">
+              <div class="card-title">Relais</div>
+              <button class="btn btn-primary btn-sm" onclick="openRelayModal()">+ Ajouter un relais</button>
+            </div>
+            <table class="data-table">
+              <thead><tr><th>Type</th><th>Tour</th><th>Date</th><th>Coach référent</th><th>Nageurs</th><th>T. engagement</th><th></th></tr></thead>
+              <tbody id="relays-list"><tr><td colspan="7" class="empty">Aucun relais</td></tr></tbody>
+            </table>
+          </div>
         </div>
 
         <!-- TAB : Import CSV -->
@@ -694,7 +704,7 @@ function showProgTab(tab) {
   document.querySelectorAll('.tab-btn').forEach((b,i) => {
     b.classList.toggle('active', ['liaisons','epreuves','import'][i] === tab);
   });
-  if (tab === 'epreuves') loadEvents();
+  if (tab === 'epreuves') { loadEvents(); loadRelays(); }
   if (tab === 'liaisons') { loadCompCoaches(); loadCompAthletes(); }
 }
 
@@ -993,7 +1003,7 @@ async function loadCompSelectForProg() {
 function onProgCompChange() {
   activeCompId = document.getElementById('prog-comp-select').value;
   document.getElementById('prog-content').style.display = activeCompId ? '' : 'none';
-  if (activeCompId) { loadCompCoaches(); loadCompAthletes(); }
+  if (activeCompId) { loadCompCoaches(); loadCompAthletes(); loadRelays(); }
   applyCompTypeToEventForm();
 }
 
@@ -1317,9 +1327,112 @@ function onAthleteInput() {
   hidden.value = match ? match.id : '';
 }
 
+// ── RELAIS ──────────────────────────────────────────────
+async function openRelayModal() {
+  if (!activeCompId) return toast('Sélectionner une compétition d\'abord', 'error');
+  const { data: coaches } = await sb.from('competition_coaches').select('coaches(id, prenom, nom)').eq('competition_id', activeCompId);
+  const coachOpts = '<option value="">— Choisir —</option>' +
+    (coaches || []).map(c => `<option value="${c.coaches.id}">${c.coaches.prenom} ${c.coaches.nom}</option>`).join('');
+  document.getElementById('relay-coach').innerHTML = coachOpts;
+  const { data: athletes } = await sb.from('competition_athletes').select('athletes(id, prenom, nom)').eq('competition_id', activeCompId);
+  const athOpts = '<option value="">— Choisir —</option>' +
+    (athletes || []).map(a => `<option value="${a.athletes.id}">${a.athletes.prenom} ${a.athletes.nom}</option>`).join('');
+  [1,2,3,4].forEach(i => { document.getElementById('relay-athlete-'+i).innerHTML = athOpts; });
+  document.getElementById('relay-type').value = '4x50m Nage libre';
+  document.getElementById('relay-tour').value = 'finale';
+  document.getElementById('relay-date').value = '';
+  document.getElementById('relay-heure').value = '';
+  document.getElementById('relay-engagement').value = '';
+  document.getElementById('relay-modal').style.display = 'flex';
+}
+
+function closeRelayModal() {
+  document.getElementById('relay-modal').style.display = 'none';
+}
+
+async function saveRelay() {
+  const typeRelais  = v('relay-type');
+  const tour        = v('relay-tour');
+  const dateEpreuve = v('relay-date');
+  const heure       = v('relay-heure');
+  const tempsEng    = v('relay-engagement');
+  const coachId     = v('relay-coach');
+  if (!typeRelais || !dateEpreuve) return toast('Type et date requis', 'error');
+  const athIds = [1,2,3,4].map(i => v('relay-athlete-'+i));
+  if (athIds.some(id => !id)) return toast('Les 4 nageurs sont requis', 'error');
+  if (new Set(athIds).size < 4) return toast('Les 4 nageurs doivent être différents', 'error');
+
+  const { data: relayEvent, error: e1 } = await sb.from('relay_events').insert({
+    competition_id: activeCompId, coach_id: coachId || null,
+    type_relais: typeRelais, tour, date_epreuve: dateEpreuve,
+    heure: heure || null, temps_engagement: tempsEng || null
+  }).select().single();
+  if (e1) return toast('Erreur : ' + e1.message, 'error');
+
+  const splits = athIds.map((athlete_id, i) => ({ relay_event_id: relayEvent.id, athlete_id, position: i+1 }));
+  const { error: e2 } = await sb.from('relay_athletes').insert(splits);
+  if (e2) return toast('Erreur nageurs : ' + e2.message, 'error');
+
+  closeRelayModal();
+  loadRelays();
+  toast('✓ Relais ajouté', 'success');
+}
+
+async function loadRelays() {
+  if (!activeCompId) return;
+  const { data } = await sb.from('relay_events')
+    .select('*, coaches(prenom, nom), relay_athletes(position, athletes(prenom, nom))')
+    .eq('competition_id', activeCompId).order('date_epreuve');
+  const tbody = document.getElementById('relays-list');
+  if (!tbody) return;
+  if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">Aucun relais</td></tr>'; return; }
+  tbody.innerHTML = data.map(r => {
+    const sorted = (r.relay_athletes || []).slice().sort((a,b) => a.position - b.position);
+    const nageurs = sorted.map(a => `${a.athletes.prenom} ${a.athletes.nom}`).join(', ');
+    return `<tr>
+      <td>${r.type_relais}</td>
+      <td>${badgeTour(r.tour)}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px">${fmtDate(r.date_epreuve)}</td>
+      <td style="font-size:12px">${r.coaches ? r.coaches.prenom+' '+r.coaches.nom : '—'}</td>
+      <td style="font-size:12px;color:var(--muted)">${nageurs || '—'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${r.temps_engagement || '—'}</td>
+      <td><button class="btn btn-sm btn-danger" onclick="deleteRelay('${r.id}')">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function deleteRelay(id) {
+  if (!confirm('Supprimer ce relais ?')) return;
+  await sb.from('relay_events').delete().eq('id', id);
+  toast('Relais supprimé'); loadRelays();
+}
+
 // ── INIT ────────────────────────────────────────────────
 _adminReady.then(() => { loadCompetitions(); loadCoaches(); loadAthletes(); });
 </script>
+
+<!-- MODAL RELAIS -->
+<div id="relay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border-radius:12px;padding:24px;min-width:540px;max-width:95vw;max-height:90vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="font-weight:600;color:var(--navy);margin-bottom:16px;font-size:15px">Ajouter un relais</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="grid-column:1/-1"><label>Type de relais *</label><select id="relay-type"><option value="4x50m Nage libre">4x50m Nage libre</option><option value="4x100m Nage libre">4x100m Nage libre</option><option value="4x200m Nage libre">4x200m Nage libre</option><option value="4x100m 4 Nages">4x100m 4 Nages</option><option value="4x50m 4 Nages Mixte">4x50m 4 Nages Mixte</option><option value="4x100m Nage libre Mixte">4x100m Nage libre Mixte</option></select></div>
+      <div><label>Tour</label><select id="relay-tour"><option value="finale" selected>Finale</option><option value="serie">Série</option><option value="demi-finale">Demi-finale</option></select></div>
+      <div><label>Date *</label><input type="date" id="relay-date"></div>
+      <div><label>Heure</label><input type="time" id="relay-heure"></div>
+      <div><label>Temps d'engagement</label><input type="text" id="relay-engagement" placeholder="3:45.12"></div>
+      <div><label>Entraîneur référent</label><select id="relay-coach"><option value="">— Choisir —</option></select></div>
+      <div><label>Nageur 1 *</label><select id="relay-athlete-1"><option value="">— Choisir —</option></select></div>
+      <div><label>Nageur 2 *</label><select id="relay-athlete-2"><option value="">— Choisir —</option></select></div>
+      <div><label>Nageur 3 *</label><select id="relay-athlete-3"><option value="">— Choisir —</option></select></div>
+      <div><label>Nageur 4 *</label><select id="relay-athlete-4"><option value="">— Choisir —</option></select></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="btn" onclick="closeRelayModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveRelay()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL D'ÉDITION GÉNÉRIQUE -->
 <div id="edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
