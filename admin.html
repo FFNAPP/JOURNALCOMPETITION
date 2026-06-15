@@ -416,11 +416,16 @@
           <div class="card">
             <div class="card-title">Ajouter une épreuve</div>
             <div class="form-grid-3">
-              <div>
+              <div id="ev-athlete-wrap">
                 <label>Nageur *</label>
                 <input type="text" id="ev-athlete-input" list="ev-athlete-list" placeholder="Taper un nom…" autocomplete="off" oninput="onAthleteInput()" style="width:100%">
                 <datalist id="ev-athlete-list"></datalist>
                 <input type="hidden" id="ev-athlete">
+              </div>
+              <!-- Champs relais (cachés par défaut) -->
+              <div id="ev-relay-coach-wrap" style="display:none">
+                <label>Entraîneur référent</label>
+                <select id="ev-relay-coach"><option value="">— Choisir —</option></select>
               </div>
               <div>
                 <label>Épreuve *</label>
@@ -431,7 +436,8 @@
                   <option>50m Brasse</option><option>100m Brasse</option><option>200m Brasse</option>
                   <option>50m Papillon</option><option>100m Papillon</option><option>200m Papillon</option>
                   <option>200m 4 Nages</option><option>400m 4 Nages</option>
-                  <option>4x100m NL</option><option>4x200m NL</option><option>4x100m 4N</option>
+                  <option>4x50m Nage libre</option><option>4x100m Nage libre</option><option>4x200m Nage libre</option>
+                  <option>4x100m 4 Nages</option><option>4x50m 4 Nages Mixte</option><option>4x100m Nage libre Mixte</option>
                   <option disabled style="color:var(--hint);font-size:11px">── Eau Libre ──</option>
                   <option value="5km">5km</option>
                   <option value="7.5km">7,5km</option>
@@ -454,6 +460,11 @@
               <div><label>Heure</label><input type="time" id="ev-heure"></div>
               <div id="ev-engagement-wrap"><label>Temps engagement <small style="font-weight:400;color:var(--hint)">(référence)</small></label><input type="text" id="ev-engagement" placeholder="58.42"></div>
               <div id="ev-ranking-wrap" style="display:none"><label>Rang initial <small style="font-weight:400;color:var(--hint)">(avant compét.)</small></label><input type="number" id="ev-ranking" placeholder="12" min="1"></div>
+              <!-- Nageurs du relais (cachés par défaut) -->
+              <div id="ev-relay-a1-wrap" style="display:none"><label>Nageur 1 *</label><select id="ev-relay-a1"><option value="">— Choisir —</option></select></div>
+              <div id="ev-relay-a2-wrap" style="display:none"><label>Nageur 2 *</label><select id="ev-relay-a2"><option value="">— Choisir —</option></select></div>
+              <div id="ev-relay-a3-wrap" style="display:none"><label>Nageur 3 *</label><select id="ev-relay-a3"><option value="">— Choisir —</option></select></div>
+              <div id="ev-relay-a4-wrap" style="display:none"><label>Nageur 4 *</label><select id="ev-relay-a4"><option value="">— Choisir —</option></select></div>
               <div style="display:flex;align-items:flex-end">
                 <button class="btn btn-primary" style="width:100%" onclick="saveEvent()">+ Ajouter</button>
               </div>
@@ -1123,8 +1134,37 @@ async function loadEvents() {
 }
 
 async function saveEvent() {
-  const athlete_id = v('ev-athlete'), epreuve = v('ev-epreuve'), date_epreuve = v('ev-date');
-  if (!athlete_id || !epreuve || !date_epreuve) return toast('Nageur, épreuve et date requis', 'error');
+  const epreuve = v('ev-epreuve'), date_epreuve = v('ev-date');
+  if (!epreuve || !date_epreuve) return toast('Épreuve et date requis', 'error');
+
+  // Relais : passer par la logique relay_events
+  if (RELAY_EPREUVES.includes(epreuve)) {
+    const tour    = v('ev-tour') === 'auto' ? 'finale' : v('ev-tour');
+    const heure   = v('ev-heure');
+    const tempsEng= EPREUVES_SANS_ENGAGEMENT.includes(epreuve) ? null : (v('ev-engagement') || null);
+    const coachId = v('ev-relay-coach');
+    const athIds  = ['ev-relay-a1','ev-relay-a2','ev-relay-a3','ev-relay-a4'].map(id => v(id));
+    if (athIds.some(id => !id)) return toast('Les 4 nageurs sont requis', 'error');
+    if (new Set(athIds).size < 4) return toast('Les 4 nageurs doivent être différents', 'error');
+    const { data: relayEvent, error: e1 } = await sb.from('relay_events').insert({
+      competition_id: activeCompId, coach_id: coachId || null,
+      type_relais: epreuve, tour, date_epreuve,
+      heure: heure || null, temps_engagement: tempsEng
+    }).select().single();
+    if (e1) return toast('Erreur : ' + e1.message, 'error');
+    const splits = athIds.map((athlete_id, i) => ({ relay_event_id: relayEvent.id, athlete_id, position: i+1 }));
+    const { error: e2 } = await sb.from('relay_athletes').insert(splits);
+    if (e2) return toast('Erreur nageurs : ' + e2.message, 'error');
+    // Reset champs relais
+    ['ev-relay-a1','ev-relay-a2','ev-relay-a3','ev-relay-a4'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('ev-relay-coach').value = '';
+    toast('✓ Relais ajouté', 'success');
+    loadRelays();
+    return;
+  }
+
+  const athlete_id = v('ev-athlete');
+  if (!athlete_id) return toast('Nageur, épreuve et date requis', 'error');
 
   const comp = allCompetitions.find(c => c.id === activeCompId);
   const typeComp = comp?.type_competition;
@@ -1268,14 +1308,52 @@ async function confirmCSVImport() {
   loadEvents();
 }
 
+const RELAY_EPREUVES = ['4x50m Nage libre','4x100m Nage libre','4x200m Nage libre','4x100m 4 Nages','4x50m 4 Nages Mixte','4x100m Nage libre Mixte','Relais 4x1500m'];
+
 function onEpreuveChange() {
   const epreuve = document.getElementById('ev-epreuve').value;
+  const isRelay = RELAY_EPREUVES.includes(epreuve);
+
+  // Champ nageur individuel ↔ champs relais
+  document.getElementById('ev-athlete-wrap').style.display    = isRelay ? 'none' : '';
+  document.getElementById('ev-relay-coach-wrap').style.display= isRelay ? '' : 'none';
+  ['ev-relay-a1-wrap','ev-relay-a2-wrap','ev-relay-a3-wrap','ev-relay-a4-wrap'].forEach(id => {
+    document.getElementById(id).style.display = isRelay ? '' : 'none';
+  });
+  // Rang initial masqué pour les relais
+  if (isRelay) {
+    document.getElementById('ev-ranking-wrap').style.display = 'none';
+    document.getElementById('ev-ranking').value = '';
+    // Pré-remplir les selects nageurs/coach si pas encore fait
+    populateRelaySelects();
+  }
+
+  // Temps engagement
   const wrap = document.getElementById('ev-engagement-wrap');
   if (EPREUVES_SANS_ENGAGEMENT.includes(epreuve)) {
     wrap.style.display = 'none';
     document.getElementById('ev-engagement').value = '';
   } else {
     wrap.style.display = '';
+  }
+}
+
+async function populateRelaySelects() {
+  if (!activeCompId) return;
+  const coachSel = document.getElementById('ev-relay-coach');
+  if (coachSel.options.length <= 1) {
+    const { data: coaches } = await sb.from('competition_coaches').select('coaches(id, prenom, nom)').eq('competition_id', activeCompId);
+    coachSel.innerHTML = '<option value="">— Choisir —</option>' +
+      (coaches || []).map(c => `<option value="${c.coaches.id}">${c.coaches.prenom} ${c.coaches.nom}</option>`).join('');
+  }
+  const ath1 = document.getElementById('ev-relay-a1');
+  if (ath1.options.length <= 1) {
+    const { data: athletes } = await sb.from('competition_athletes').select('athletes(id, prenom, nom)').eq('competition_id', activeCompId);
+    const opts = '<option value="">— Choisir —</option>' +
+      (athletes || []).map(a => `<option value="${a.athletes.id}">${a.athletes.prenom} ${a.athletes.nom}</option>`).join('');
+    ['ev-relay-a1','ev-relay-a2','ev-relay-a3','ev-relay-a4'].forEach(id => {
+      document.getElementById(id).innerHTML = opts;
+    });
   }
 }
 
