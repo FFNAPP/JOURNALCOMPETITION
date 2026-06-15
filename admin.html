@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FFN — Administration</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/auth.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
@@ -36,6 +37,10 @@
     height: 56px; position: sticky; top: 0; z-index: 100;
   }
   .header-brand { display: flex; align-items: center; gap: 12px; }
+  .nav-bar { background: var(--navy); padding: 0 2rem 10px; display: flex; gap: 6px; align-items: center; position: sticky; top: 56px; z-index: 99; }
+  .nav-btn { background: none; border: none; color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 500; padding: 7px 14px; border-radius: 8px; cursor: pointer; text-decoration: none; font-family: 'DM Sans', sans-serif; transition: background .15s, color .15s; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+  .nav-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .nav-active { background: rgba(255,255,255,0.18) !important; color: #fff !important; font-weight: 600; }
   .header-logo {
     width: 32px; height: 32px; background: var(--accent);
     border-radius: 8px; display: flex; align-items: center; justify-content: center;
@@ -186,9 +191,18 @@
 <div class="header">
   <div class="header-brand">
     <div class="header-logo">FFN</div>
-    <div class="header-title">Administration — Journal de bord</div>
+    <div class="header-title">Administration</div>
   </div>
-  <div class="header-badge">ADMIN</div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div class="header-badge">ADMIN</div>
+    <button onclick="openPasswordModal()" style="background:none;border:none;color:rgba(255,255,255,0.6);cursor:pointer;font-size:18px;padding:4px 8px;border-radius:6px;line-height:1" title="Modifier le mot de passe">🔑</button>
+    <button onclick="logout()" style="background:none;border:1px solid rgba(255,255,255,0.3);color:rgba(255,255,255,0.8);cursor:pointer;font-size:12px;font-weight:500;padding:5px 12px;border-radius:6px;font-family:'DM Sans',sans-serif">Déconnexion</button>
+  </div>
+</div>
+<div class="nav-bar">
+  <a href="admin.html"     class="nav-btn nav-active">⚙️ Admin</a>
+  <a href="journal.html"   class="nav-btn">📓 Journal</a>
+  <a href="dashboard.html" class="nav-btn">📊 Dashboard</a>
 </div>
 
 <div class="layout">
@@ -386,7 +400,9 @@
             <div class="card">
               <div class="card-title">Nageurs de la compétition</div>
               <div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap">
-                <select id="add-athlete-select" style="flex:1;min-width:120px"><option value="">— Nageur —</option></select>
+                <input type="text" id="add-athlete-input" list="add-athlete-datalist" placeholder="Taper un nom…" autocomplete="off" oninput="onAddAthleteInput()" style="flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                <datalist id="add-athlete-datalist"></datalist>
+                <input type="hidden" id="add-athlete-select">
                 <select id="add-athlete-coach" style="flex:1;min-width:120px"><option value="">— Entraîneur —</option></select>
                 <button class="btn btn-sm btn-primary" onclick="addAthleteToComp()">Ajouter</button>
               </div>
@@ -402,7 +418,9 @@
             <div class="form-grid-3">
               <div>
                 <label>Nageur *</label>
-                <select id="ev-athlete"><option value="">—</option></select>
+                <input type="text" id="ev-athlete-input" list="ev-athlete-list" placeholder="Taper un nom…" autocomplete="off" oninput="onAthleteInput()" style="width:100%">
+                <datalist id="ev-athlete-list"></datalist>
+                <input type="hidden" id="ev-athlete">
               </div>
               <div>
                 <label>Épreuve *</label>
@@ -435,6 +453,7 @@
               <div><label>Date *</label><input type="date" id="ev-date"></div>
               <div><label>Heure</label><input type="time" id="ev-heure"></div>
               <div id="ev-engagement-wrap"><label>Temps engagement <small style="font-weight:400;color:var(--hint)">(référence)</small></label><input type="text" id="ev-engagement" placeholder="58.42"></div>
+              <div id="ev-ranking-wrap" style="display:none"><label>Rang initial <small style="font-weight:400;color:var(--hint)">(avant compét.)</small></label><input type="number" id="ev-ranking" placeholder="12" min="1"></div>
               <div style="display:flex;align-items:flex-end">
                 <button class="btn btn-primary" style="width:100%" onclick="saveEvent()">+ Ajouter</button>
               </div>
@@ -445,9 +464,13 @@
               <div class="card-title">Programme enregistré <span id="events-count">0</span></div>
               <button class="btn btn-sm" onclick="loadEvents()">↺</button>
             </div>
+            <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+              <input type="text" id="filter-athlete" placeholder="🔍 Filtrer par nageur…" oninput="filterEvents()" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+              <input type="text" id="filter-epreuve" placeholder="🔍 Filtrer par épreuve…" oninput="filterEvents()" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+            </div>
             <table class="data-table">
-              <thead><tr><th>Nageur</th><th>Épreuve</th><th>Tour</th><th>Date</th><th>Heure</th><th>T. engagement</th><th></th></tr></thead>
-              <tbody id="events-list"><tr><td colspan="7" class="empty">Aucune épreuve</td></tr></tbody>
+              <thead><tr><th>Nageur</th><th>Épreuve</th><th>Tour</th><th>Date</th><th>Heure</th><th>T. engagement</th><th>Rang init.</th><th></th></tr></thead>
+              <tbody id="events-list"><tr><td colspan="8" class="empty">Aucune épreuve</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -567,9 +590,15 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const SUPABASE_URL = 'https://bpdxdljctybdmtemubjh.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwZHhkbGpjdHliZG10ZW11YmpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NzA2MTgsImV4cCI6MjA5NTU0NjYxOH0.b5GKWWTWTsrYPGmVPvexLWqAiQvkMl43Pzo96mz6lQw';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// ── INIT AUTH ──────────────────────────────────────────────
+// _adminReady résout quand l'auth est confirmée ; les autres scripts attendent dessus.
+let _resolveAdminReady;
+const _adminReady = new Promise(res => { _resolveAdminReady = res; });
+(async () => {
+  const session = await requireRole('dtn');
+  if (!session) return;
+  _resolveAdminReady();
+})();
 
 // ── MAPPING TOURS PAR TYPE DE COMPÉTITION ─────────────────────────
 const EPREUVES_SANS_ENGAGEMENT = ['5km','7.5km','10km','Relais 4x1500m','KnockOut'];
@@ -975,13 +1004,16 @@ function applyCompTypeToEventForm() {
   const tourSel = document.getElementById('ev-tour');
   const note = document.getElementById('ev-tour-note');
   if (!tourSel) return;
+  const rankingWrap = document.getElementById('ev-ranking-wrap');
   if (comp && comp.type_competition === 'COMEN') {
-    tourSel.value = 'finale';   // classement au temps = une seule finale
+    tourSel.value = 'finale';
     tourSel.style.display = 'none';
     if (note) note.style.display = '';
+    if (rankingWrap) rankingWrap.style.display = '';
   } else {
     tourSel.style.display = '';
     if (note) note.style.display = 'none';
+    if (rankingWrap) { rankingWrap.style.display = 'none'; document.getElementById('ev-ranking').value = ''; }
   }
 }
 
@@ -1055,18 +1087,24 @@ async function removeAthleteFromComp(id) {
 async function loadEvents() {
   if (!activeCompId) return;
   applyCompTypeToEventForm();
-  const { data } = await sb.from('events').select('*, athletes(*)').eq('competition_id', activeCompId).order('date_epreuve').order('heure');
+  const { data: rawEvents } = await sb.from('events').select('*, athletes(*)').eq('competition_id', activeCompId).order('date_epreuve').order('heure');
+  const data = (rawEvents || []).slice().sort((a, b) => {
+    const na = (a.athletes?.nom + ' ' + a.athletes?.prenom).toLowerCase();
+    const nb = (b.athletes?.nom + ' ' + b.athletes?.prenom).toLowerCase();
+    return na.localeCompare(nb, 'fr');
+  });
   document.getElementById('events-count').textContent = (data || []).length;
   const tbody = document.getElementById('events-list');
   if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">Aucune épreuve</td></tr>'; return; }
   tbody.innerHTML = data.map(e => `
-    <tr>
+    <tr data-athlete="${(e.athletes.prenom+' '+e.athletes.nom).toLowerCase()}" data-epreuve="${e.epreuve.toLowerCase()}">
       <td>${e.athletes.prenom} ${e.athletes.nom}</td>
       <td>${e.epreuve}</td>
       <td>${badgeTour(e.tour)}</td>
       <td style="font-family:'DM Mono',monospace;font-size:12px">${fmtDate(e.date_epreuve)}</td>
       <td style="font-family:'DM Mono',monospace;font-size:12px">${e.heure || '—'}</td>
       <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${e.temps_engagement || '—'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${e.ranking_initial != null ? '#'+e.ranking_initial : '—'}</td>
       <td><div class="actions">
         <button class="btn btn-sm" onclick="editEvent('${e.id}')">✎</button>
         <button class="btn btn-sm btn-danger" onclick="deleteEvent('${e.id}')">✕</button>
@@ -1082,8 +1120,9 @@ async function saveEvent() {
   const typeComp = comp?.type_competition;
   const manualTour = v('ev-tour');
   const engagement = EPREUVES_SANS_ENGAGEMENT.includes(epreuve) ? null : (v('ev-engagement') || null);
+  const rankingRaw = document.getElementById('ev-ranking')?.value;
+  const ranking_initial = rankingRaw ? parseInt(rankingRaw) : null;
 
-  // Si un type de compétition est défini, générer les tours automatiquement
   if (typeComp && manualTour === 'auto') {
     const tours = getToursForEpreuve(epreuve, typeComp);
     const baseDate = new Date(date_epreuve);
@@ -1095,20 +1134,21 @@ async function saveEvent() {
       const { error } = await sb.from('events').insert({
         competition_id: activeCompId, athlete_id, epreuve,
         tour: t.tour, date_epreuve: dateStr,
-        heure: v('ev-heure') || null, temps_engagement: engagement
+        heure: v('ev-heure') || null, temps_engagement: engagement, ranking_initial
       });
       if (!error) ok++;
     }
     toast(`✓ ${ok} épreuve(s) créée(s) automatiquement`);
   } else {
-    // Mode manuel : un seul tour
     const { error } = await sb.from('events').insert({
       competition_id: activeCompId, athlete_id, epreuve,
       tour: manualTour, date_epreuve,
-      heure: v('ev-heure') || null, temps_engagement: engagement
+      heure: v('ev-heure') || null, temps_engagement: engagement, ranking_initial
     });
     if (error) return toast('Erreur : ' + error.message, 'error');
     toast('✓ Épreuve ajoutée');
+    document.getElementById('ev-athlete-input').value = '';
+    document.getElementById('ev-athlete').value = '';
   }
   loadEvents();
 }
@@ -1135,6 +1175,7 @@ async function editEvent(id) {
       <div><label>Date *</label><input type="date" id="edit-ev-date" value="${e.date_epreuve || ''}"></div>
       <div><label>Heure</label><input type="time" id="edit-ev-heure" value="${e.heure || ''}"></div>
       <div id="edit-ev-engagement-wrap" style="${sansEng ? 'display:none' : ''}"><label>Temps engagement</label><input type="text" id="edit-ev-engagement" value="${esc(e.temps_engagement)}" placeholder="58.42"></div>
+      <div id="edit-ev-ranking-wrap" style="${isComen ? '' : 'display:none'}"><label>Rang initial <small style="font-weight:400;color:var(--muted)">(avant compét.)</small></label><input type="number" id="edit-ev-ranking" value="${e.ranking_initial != null ? e.ranking_initial : ''}" placeholder="12" min="1"></div>
     </div>`;
 
   openEditModal('Modifier l\'épreuve', id, html, saveEditEvent);
@@ -1154,9 +1195,11 @@ async function saveEditEvent(id) {
   const epreuve = ev_('edit-ev-epreuve'), date_epreuve = ev_('edit-ev-date');
   if (!epreuve || !date_epreuve) return toast('Épreuve et date requis', 'error');
   const engagement = EPREUVES_SANS_ENGAGEMENT.includes(epreuve) ? null : (ev_('edit-ev-engagement') || null);
+  const rankingRaw = document.getElementById('edit-ev-ranking')?.value;
+  const ranking_initial = rankingRaw ? parseInt(rankingRaw) : null;
   const { error } = await sb.from('events').update({
     epreuve, tour: ev_('edit-ev-tour'), date_epreuve,
-    heure: ev_('edit-ev-heure') || null, temps_engagement: engagement
+    heure: ev_('edit-ev-heure') || null, temps_engagement: engagement, ranking_initial
   }).eq('id', id);
   if (error) return toast('Erreur : ' + error.message, 'error');
   toast('✓ Épreuve mise à jour');
@@ -1205,7 +1248,8 @@ async function confirmCSVImport() {
       competition_id: activeCompId, athlete_id: athlete.id,
       epreuve: row.epreuve, tour: row.tour || 'serie',
       date_epreuve: row.date, heure: row.heure || null,
-      temps_engagement: row.temps_engagement || null
+      temps_engagement: row.temps_engagement || null,
+      ranking_initial: row.ranking_initial ? parseInt(row.ranking_initial) : null
     });
     if (!error) ok++; else skip++;
   }
@@ -1242,14 +1286,39 @@ function refreshCoachSelects() {
   if (sel) sel.innerHTML = '<option value="">— Sélectionner —</option>' + allCoaches.map(c => `<option value="${c.id}">${c.prenom} ${c.nom}</option>`).join('');
 }
 function refreshAthleteSelects() {
-  const sel = document.getElementById('add-athlete-select');
-  if (sel) sel.innerHTML = '<option value="">— Sélectionner —</option>' + allAthletes.map(a => `<option value="${a.id}">${a.prenom} ${a.nom}</option>`).join('');
+  const opts = allAthletes.map(a => `<option value="${a.prenom} ${a.nom}" data-id="${a.id}">`).join('');
+  const dl = document.getElementById('ev-athlete-list');
+  if (dl) dl.innerHTML = opts;
+  const dl2 = document.getElementById('add-athlete-datalist');
+  if (dl2) dl2.innerHTML = opts;
+}
+
+function onAddAthleteInput() {
+  const input = document.getElementById('add-athlete-input').value.trim();
+  const hidden = document.getElementById('add-athlete-select');
+  const match = allAthletes.find(a => `${a.prenom} ${a.nom}` === input);
+  hidden.value = match ? match.id : '';
+}
+
+function filterEvents() {
+  const fA = document.getElementById('filter-athlete').value.trim().toLowerCase();
+  const fE = document.getElementById('filter-epreuve').value.trim().toLowerCase();
+  document.querySelectorAll('#events-list tr[data-athlete]').forEach(tr => {
+    const athlete = (tr.dataset.athlete || '').toLowerCase();
+    const epreuve = (tr.dataset.epreuve || '').toLowerCase();
+    tr.style.display = ((!fA || athlete.includes(fA)) && (!fE || epreuve.includes(fE))) ? '' : 'none';
+  });
+}
+
+function onAthleteInput() {
+  const input = document.getElementById('ev-athlete-input').value.trim();
+  const hidden = document.getElementById('ev-athlete');
+  const match = allAthletes.find(a => `${a.prenom} ${a.nom}` === input);
+  hidden.value = match ? match.id : '';
 }
 
 // ── INIT ────────────────────────────────────────────────
-loadCompetitions();
-loadCoaches();
-loadAthletes();
+_adminReady.then(() => { loadCompetitions(); loadCoaches(); loadAthletes(); });
 </script>
 
 <!-- MODAL D'ÉDITION GÉNÉRIQUE -->

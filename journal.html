@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FFN — Journal de bord</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/auth.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap');
@@ -25,6 +26,12 @@
   .header-brand { display: flex; align-items: center; gap: 10px; }
   .header-logo { width: 28px; height: 28px; background: var(--accent); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; }
   .header-logo.staff { background: var(--teal); }
+  .nav-bar { background: var(--navy); padding: 0 1.5rem 10px; display: flex; gap: 6px; align-items: center; position: sticky; top: 52px; z-index: 99; }
+  .nav-btn { background: none; border: none; color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 500; padding: 7px 14px; border-radius: 8px; cursor: pointer; text-decoration: none; font-family: 'DM Sans', sans-serif; transition: background .15s, color .15s; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+  .nav-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .nav-active { background: rgba(255,255,255,0.18) !important; color: #fff !important; font-weight: 600; }
+  .nav-save-sticky { margin-left: auto; background: var(--accent); border: none; color: #fff; font-size: 13px; font-weight: 600; padding: 6px 16px; border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif; display: inline-flex; align-items: center; gap: 6px; transition: background .15s; }
+  .nav-save-sticky:hover { background: #c85520; }
   .header-title { color: #fff; font-size: 14px; font-weight: 500; }
   .header-right { display: flex; align-items: center; gap: 12px; }
   .coach-name { color: rgba(255,255,255,0.7); font-size: 12px; }
@@ -168,7 +175,9 @@
   .postcomp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
   /* ── SAVE BAR ── */
-  .save-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; margin-top: 1rem; position: sticky; bottom: 1rem; box-shadow: 0 4px 20px rgba(10,22,40,.12); }
+  .save-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; margin-top: 1rem; position: sticky; bottom: 1rem; box-shadow: 0 4px 24px rgba(10,22,40,.18); z-index: 50; }
+  #save-btn { font-size: 14px; padding: 10px 24px; font-weight: 700; background: var(--accent); border-color: var(--accent); color: #fff; }
+  #save-btn:hover { background: #c85520; }
   .save-info { font-size: 12px; color: var(--muted); }
 
   /* ── BUTTONS ── */
@@ -205,7 +214,18 @@
     <span class="role-badge" id="role-badge">STAFF</span>
     <span class="coach-name" id="header-coach-name"></span>
     <span class="save-status" id="save-status">Non sauvegardé</span>
+    <button onclick="openPasswordModal()" style="background:none;border:none;color:rgba(255,255,255,0.6);cursor:pointer;font-size:18px;padding:4px 8px;border-radius:6px;line-height:1" title="Modifier le mot de passe">🔑</button>
+    <button onclick="logout()" style="background:none;border:1px solid rgba(255,255,255,0.3);color:rgba(255,255,255,0.8);cursor:pointer;font-size:12px;font-weight:500;padding:5px 12px;border-radius:6px;font-family:'DM Sans',sans-serif">Déconnexion</button>
   </div>
+</div>
+<div class="nav-bar">
+  <a id="admin-link" href="admin.html" class="nav-btn" style="display:none">⚙️ Admin</a>
+  <a href="journal.html"   class="nav-btn nav-active">📓 Journal</a>
+  <a href="dashboard.html" class="nav-btn">📊 Dashboard</a>
+  <button id="nav-save-btn" onclick="saveCurrentPhase()" class="nav-save-sticky" style="display:none">
+    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+    Sauvegarder
+  </button>
 </div>
 
 <!-- ══════════════════════════════════
@@ -217,19 +237,19 @@
       <svg width="24" height="24" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M3 21a9 9 0 0118 0"/></svg>
     </div>
     <div class="setup-title">Journal de bord</div>
-    <div class="setup-sub">Sélectionnez votre compétition et votre profil pour commencer.</div>
+    <div class="setup-sub" id="setup-sub">Sélectionnez votre compétition pour commencer.</div>
 
-    <div style="margin-bottom:12px">
+    <div id="dtn-no-coach-banner" style="display:none;margin-bottom:1rem;padding:12px;background:#FFF3EE;border:1px solid #F5C9B3;border-radius:8px;font-size:13px;color:#C05A20">
+      Aucun carnet ne vous est attribué — la synthèse est disponible dans le <a href="dashboard.html" style="color:#1B4F8A;text-decoration:underline">tableau de bord</a>.
+    </div>
+
+    <div style="margin-bottom:12px" id="setup-comp-wrap">
       <label>Compétition</label>
       <select id="setup-comp" onchange="onSetupCompChange()"><option value="">— Choisir —</option></select>
     </div>
-    <div style="margin-bottom:8px">
-      <label>Votre profil</label>
-      <select id="setup-coach" disabled onchange="onCoachChange()"><option value="">— D'abord choisir une compétition —</option></select>
-    </div>
     <div class="role-indicator" id="role-indicator"></div>
 
-    <div style="margin-top:1.5rem">
+    <div style="margin-top:1.5rem" id="setup-start-wrap">
       <button class="btn btn-primary" id="start-btn" style="width:100%;justify-content:center" onclick="startJournal()">Ouvrir le journal →</button>
     </div>
   </div>
@@ -423,10 +443,9 @@
         <table class="result-table">
           <thead><tr><th>Élément</th><th style="width:160px">Statut</th><th>Observations</th></tr></thead>
           <tbody>
-            <tr><td>Tenues EDF</td><td><select id="mat-tenues" style="font-size:12px"><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="mat-tenues-obs" placeholder="Observations…"></td></tr>
-            <tr><td>Équipement compétition</td><td><select id="mat-equipement-comp" style="font-size:12px"><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="mat-equipement-comp-obs" placeholder="Observations…"></td></tr>
-            <tr><td>Équipement suivi et analyse</td><td><select id="mat-equipement-analyse" style="font-size:12px"><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="mat-equipement-analyse-obs" placeholder="Observations…"></td></tr>
-            <tr><td>Matériel médical et kiné</td><td><select id="mat-medical" style="font-size:12px"><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="mat-medical-obs" placeholder="Observations…"></td></tr>
+            <tr><td>Équipement sportif / entraînement</td><td><select id="mat-equipement-comp" style="font-size:12px"><option value="Non concerné">Non concerné</option><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="mat-equipement-comp-obs" placeholder="Observations…"></td></tr>
+            <tr><td>Équipement suivi et analyse</td><td><select id="mat-equipement-analyse" style="font-size:12px"><option value="Non concerné">Non concerné</option><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="mat-equipement-analyse-obs" placeholder="Observations…"></td></tr>
+            <tr><td>Matériel médical et kiné</td><td><select id="mat-medical" style="font-size:12px"><option value="Non concerné">Non concerné</option><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="mat-medical-obs" placeholder="Observations…"></td></tr>
           </tbody>
         </table>
       </div>
@@ -486,7 +505,7 @@
       </div>
       <div class="section-body">
         <table class="result-table">
-          <thead><tr><th style="width:20%">Nageur·se</th><th style="width:22%">Épreuve</th><th style="width:12%">Tour</th><th style="width:15%">A nagé ?</th><th style="width:12%">Temps</th><th style="width:7%">Rang</th><th>Observations</th></tr></thead>
+          <thead><tr><th style="width:18%">Nageur·se</th><th style="width:20%">Épreuve</th><th style="width:10%">Tour</th><th style="width:12%">A nagé ?</th><th style="width:10%">Temps</th><th style="width:6%">Rang</th><th style="width:10%">Rang init. → Δ</th><th>Observations</th></tr></thead>
           <tbody id="results-tbody"></tbody>
         </table>
         <div style="font-size:12px;color:var(--hint)">Le programme est pré-rempli depuis les épreuves du jour.</div>
@@ -677,10 +696,6 @@
 
   <!-- ════════ ZONE COMPÉTITION — STAFF ════════ -->
   <div id="zone-staff" style="display:none">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding:0 1rem;background:var(--surface2);border-radius:8px;padding:1rem">
-      <div style="font-weight:600;color:var(--navy)">Bilan Staff</div>
-      <button class="btn btn-sm" onclick="generateStaffPDF()" style="background:var(--blue-light);color:#fff">↓ Exporter PDF</button>
-    </div>
 
     <!-- ASPECTS LOGISTIQUES -->
     <div class="section" style="border-left:3px solid var(--blue-light)">
@@ -920,17 +935,16 @@
     <div class="section">
       <div class="section-head" onclick="toggleSection(this)">
         <div class="section-num green">III</div>
-        <div class="section-title">Bilan logistique</div>
+        <div class="section-title">Bilan Matériel et équipements</div>
         <div class="section-chevron open">▾</div>
       </div>
       <div class="section-body">
         <table class="result-table">
           <thead><tr><th>Élément</th><th style="width:160px">Statut</th><th>Observations</th></tr></thead>
           <tbody>
-            <tr><td>Tenues EDF</td><td><select id="pcs-mat-tenues" style="font-size:12px"><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="pcs-mat-tenues-obs" placeholder="Observations…"></td></tr>
-            <tr><td>Équipement technique compétition</td><td><select id="pcs-mat-equipement-comp" style="font-size:12px"><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="pcs-mat-equipement-comp-obs" placeholder="Observations…"></td></tr>
-            <tr><td>Équipement analyse</td><td><select id="pcs-mat-equipement-analyse" style="font-size:12px"><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="pcs-mat-equipement-analyse-obs" placeholder="Observations…"></td></tr>
-            <tr><td>Matériel médical</td><td><select id="pcs-mat-medical" style="font-size:12px"><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="pcs-mat-medical-obs" placeholder="Observations…"></td></tr>
+            <tr><td>Équipement sportif / entraînement</td><td><select id="pcs-mat-equipement-comp" style="font-size:12px"><option value="Non concerné">Non concerné</option><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="pcs-mat-equipement-comp-obs" placeholder="Observations…"></td></tr>
+            <tr><td>Équipement analyse</td><td><select id="pcs-mat-equipement-analyse" style="font-size:12px"><option value="Non concerné">Non concerné</option><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="pcs-mat-equipement-analyse-obs" placeholder="Observations…"></td></tr>
+            <tr><td>Matériel médical</td><td><select id="pcs-mat-medical" style="font-size:12px"><option value="Non concerné">Non concerné</option><option value="Conforme">Conforme</option><option value="Partiel">Partiel</option><option value="Insuffisant">Insuffisant</option></select></td><td><input type="text" id="pcs-mat-medical-obs" placeholder="Observations…"></td></tr>
           </tbody>
         </table>
         <div><label>Problèmes administratifs rencontrés</label><textarea id="pcs-problemes-admin" placeholder="Difficultés administratives, points à améliorer…"></textarea></div>
@@ -1082,7 +1096,7 @@
   <div class="save-bar" id="save-bar" style="display:none">
     <div class="save-info" id="save-info">Données non sauvegardées</div>
     <div style="display:flex;gap:8px">
-      <button class="btn" onclick="resetSetup()">← Changer de profil</button>
+      <button class="btn" onclick="resetSetup()">← Changer de compétition</button>
       <button class="btn btn-accent" id="save-btn" onclick="saveCurrentPhase()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         Sauvegarder
@@ -1094,9 +1108,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const SUPABASE_URL = 'https://bpdxdljctybdmtemubjh.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwZHhkbGpjdHliZG10ZW11YmpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NzA2MTgsImV4cCI6MjA5NTU0NjYxOH0.b5GKWWTWTsrYPGmVPvexLWqAiQvkMl43Pzo96mz6lQw';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// sb, requireSession, getRole, getCoachId, logout fournis par assets/auth.js
 
 // ── AFFICHEUR D'ERREURS (diagnostic à distance) ────────────
 function showFatalError(msg) {
@@ -1369,6 +1381,51 @@ function applyPhase(phases) {
 
 // ── SETUP ──────────────────────────────────────────────────
 async function initSetup() {
+  const session = await requireSession();
+  if (!session) return;
+
+  const myCoachId = getCoachId(session);
+  activeCoachId = myCoachId;
+  const myRole = getRole(session);
+
+  if (myRole === 'dtn') {
+    document.getElementById('admin-link').style.display = 'inline-block';
+  }
+
+  if (!myCoachId) {
+    // DTN sans carnet : afficher bandeau, masquer saisie
+    document.getElementById('dtn-no-coach-banner').style.display = 'block';
+    document.getElementById('setup-comp-wrap').style.display = 'none';
+    document.getElementById('setup-start-wrap').style.display = 'none';
+    document.getElementById('setup-sub').style.display = 'none';
+    return;
+  }
+
+  // Déterminer le rôle staff depuis la base
+  let activeRoleFromDb = 'entraineur';
+  const { data: coachData } = await sb.from('coaches').select('role, prenom, nom').eq('id', myCoachId).maybeSingle();
+  if (coachData?.role === 'staff_responsable') activeRoleFromDb = 'staff_responsable';
+  activeRole = activeRoleFromDb;
+
+  // Afficher le nom du coach connecté dans le header
+  if (coachData) {
+    document.getElementById('header-coach-name').textContent = coachData.prenom + ' ' + coachData.nom;
+    if (activeRole === 'staff_responsable') {
+      document.getElementById('header-logo').classList.add('staff');
+      document.getElementById('role-badge').classList.add('visible');
+    }
+  }
+
+  // Afficher l'indicateur de rôle sur l'écran de setup
+  const ind = document.getElementById('role-indicator');
+  if (activeRole === 'staff_responsable') {
+    ind.className = 'role-indicator staff';
+    ind.textContent = '★ Profil Responsable d\'équipe — questionnaire staff';
+  } else {
+    ind.className = 'role-indicator entraineur';
+    ind.textContent = 'Profil Entraîneur — journal de bord';
+  }
+
   const { data: comps } = await sb.from('competitions').select('*').order('date_debut', { ascending: false });
   const sel = document.getElementById('setup-comp');
   (comps || []).forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.nom; sel.appendChild(o); });
@@ -1378,61 +1435,19 @@ async function initSetup() {
 
 async function onSetupCompChange() {
   activeCompId = document.getElementById('setup-comp').value;
-  const coachSel = document.getElementById('setup-coach');
-  coachSel.innerHTML = '<option value="">— Choisir —</option>';
-  coachSel.disabled = !activeCompId;
-  document.getElementById('role-indicator').className = 'role-indicator';
   if (!activeCompId) return;
   const { data: compData } = await sb.from('competitions').select('id, nom, date_stage_debut, date_stage_fin, date_voyage_aller, date_voyage_retour, date_debut, date_fin, date_bilan').eq('id', activeCompId).single();
   activeComp = compData;
-  const { data } = await sb.from('competition_coaches').select('*, coaches(*)').eq('competition_id', activeCompId);
-  (data || []).forEach(r => {
-    const o = document.createElement('option');
-    o.value = r.coach_id;
-    o.dataset.role = r.coaches.role || 'entraineur';
-    o.textContent = r.coaches.prenom + ' ' + r.coaches.nom + (r.coaches.role === 'staff_responsable' ? ' ★' : '');
-    coachSel.appendChild(o);
-  });
-}
-
-function onCoachChange() {
-  const sel = document.getElementById('setup-coach');
-  const opt = sel.options[sel.selectedIndex];
-  const role = opt?.dataset?.role || 'entraineur';
-  const ind = document.getElementById('role-indicator');
-  if (!opt?.value) { ind.className = 'role-indicator'; return; }
-  if (role === 'staff_responsable') {
-    ind.className = 'role-indicator staff';
-    ind.textContent = '★ Profil Responsable d\'équipe — questionnaire staff';
-  } else {
-    ind.className = 'role-indicator entraineur';
-    ind.textContent = 'Profil Entraîneur — journal de bord';
-  }
 }
 
 async function startJournal() {
-  activeCoachId = document.getElementById('setup-coach').value;
-  activeCompId  = document.getElementById('setup-comp').value;
-  if (!activeCoachId || !activeCompId) return toast('Sélectionner compétition et profil', 'error');
-
-  const sel = document.getElementById('setup-coach');
-  const opt = sel.options[sel.selectedIndex];
-  activeRole = opt?.dataset?.role || 'entraineur';
-
-  document.getElementById('header-coach-name').textContent = opt.textContent.replace(' ★','');
-  // Adapter le header selon le rôle
-  const logo = document.getElementById('header-logo');
-  const badge = document.getElementById('role-badge');
-  if (activeRole === 'staff_responsable') {
-    logo.classList.add('staff');
-    badge.classList.add('visible');
-  } else {
-    logo.classList.remove('staff');
-    badge.classList.remove('visible');
-  }
+  activeCompId = document.getElementById('setup-comp').value;
+  if (!activeCoachId || !activeCompId) return toast('Sélectionner une compétition', 'error');
 
   document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('journal-wrap').style.display = 'block';
+  const nsb = document.getElementById('nav-save-btn');
+  if (nsb) { nsb.style.display = 'inline-flex'; }
 
   // Garantir que les dates de la compétition sont chargées (évite une course
   // réseau : clic « Ouvrir » avant la fin du préchargement async => activeComp null
@@ -1462,7 +1477,9 @@ async function startJournal() {
 function resetSetup() {
   document.getElementById('setup-screen').style.display = '';
   document.getElementById('journal-wrap').style.display = 'none';
-  activeCompId = activeCoachId = activeComp = null;
+  const nsb = document.getElementById('nav-save-btn');
+  if (nsb) nsb.style.display = 'none';
+  activeCompId = activeComp = null;
 }
 
 // ── CHARGEMENT DU JOUR ─────────────────────────────────────
@@ -1634,13 +1651,26 @@ function fillPostcompForm(d) {
 function renderResultsTable() {
   const tbody = document.getElementById('results-tbody');
   if (!currentEvents.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--hint);font-size:13px">Aucune épreuve prévue ce jour</td></tr>'; return;
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:1rem;color:var(--hint);font-size:13px">Aucune épreuve prévue ce jour</td></tr>'; return;
   }
   tbody.innerHTML = currentEvents.map(ev => {
     const rs = resultStates[ev.id] || {};
     const anage = rs.a_nage !== undefined ? rs.a_nage : true;
     const tourClass = ev.tour==='finale' ? 'tour-finale' : ev.tour==='demi-finale' ? 'tour-demi' : 'tour-serie';
     const te = ev.temps_engagement ? `<br><span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--hint)">Réf: ${ev.temps_engagement}</span>` : '';
+    // Delta ranking_initial → rang final
+    let deltaHtml = '—';
+    if (ev.ranking_initial != null) {
+      const rangFinal = rs.rang ? parseInt(rs.rang) : null;
+      if (rangFinal) {
+        const delta = ev.ranking_initial - rangFinal;
+        const color = delta > 0 ? 'var(--success)' : delta < 0 ? 'var(--error)' : 'var(--muted)';
+        const sign  = delta > 0 ? '▲ +' : delta < 0 ? '▼ ' : '= ';
+        deltaHtml = `<span style="font-size:11px;font-weight:600;color:var(--muted)">#${ev.ranking_initial}</span><br><span style="font-size:11px;font-weight:600;color:${color}">${sign}${delta}</span>`;
+      } else {
+        deltaHtml = `<span style="font-size:11px;color:var(--muted)">#${ev.ranking_initial}</span>`;
+      }
+    }
     return `<tr>
       <td><strong style="font-size:12px">${ev.athletes.prenom}<br>${ev.athletes.nom}</strong></td>
       <td style="font-size:12px">${ev.epreuve}${ev.heure?'<br><span style="color:var(--hint);font-size:11px;font-family:DM Mono,monospace">'+ev.heure.slice(0,5)+'</span>':''}${te}</td>
@@ -1651,6 +1681,7 @@ function renderResultsTable() {
       </div></td>
       <td><input type="text" value="${rs.temps||''}" placeholder="58.42" style="width:70px" oninput="setResult('${ev.id}','temps',this.value)"></td>
       <td><input type="text" value="${rs.rang||''}"  placeholder="4"     style="width:45px" oninput="setResult('${ev.id}','rang',this.value)"></td>
+      <td style="text-align:center;line-height:1.4">${deltaHtml}</td>
       <td><input type="text" value="${rs.observations||''}" placeholder="Observations…" oninput="setResult('${ev.id}','observations',this.value)"></td>
     </tr>`;
   }).join('');
@@ -1661,7 +1692,29 @@ function setNage(eid, val, btn) {
   btn.closest('tr').querySelectorAll('.nage-btn').forEach(b => b.className='nage-btn');
   btn.classList.add(val ? 'oui' : 'non');
 }
-function setResult(eid, f, v) { if (!resultStates[eid]) resultStates[eid] = {}; resultStates[eid][f] = v; }
+function setResult(eid, f, val) {
+  if (!resultStates[eid]) resultStates[eid] = {};
+  resultStates[eid][f] = val;
+  // Recalcul live du delta rang uniquement
+  if (f === 'rang') {
+    const ev = currentEvents.find(e => e.id === eid);
+    if (ev && ev.ranking_initial != null) {
+      const row = document.querySelector(`input[oninput*="'${eid}','rang'"]`)?.closest('tr');
+      if (row) {
+        const deltaCell = row.cells[6];
+        const rangFinal = val ? parseInt(val) : null;
+        if (rangFinal) {
+          const delta = ev.ranking_initial - rangFinal;
+          const color = delta > 0 ? 'var(--success)' : delta < 0 ? 'var(--error)' : 'var(--muted)';
+          const sign  = delta > 0 ? '▲ +' : delta < 0 ? '▼ ' : '= ';
+          deltaCell.innerHTML = `<span style="font-size:11px;font-weight:600;color:var(--muted)">#${ev.ranking_initial}</span><br><span style="font-size:11px;font-weight:600;color:${color}">${sign}${delta}</span>`;
+        } else {
+          deltaCell.innerHTML = `<span style="font-size:11px;color:var(--muted)">#${ev.ranking_initial}</span>`;
+        }
+      }
+    }
+  }
+}
 
 // ── NON-COMPÉTITEURS ────────────────────────────────────────
 async function loadNonCompetitors(date) {
@@ -1991,10 +2044,10 @@ function fillPrecompStaffForm(d) {
     updateStaffSlider(sl, sid+'-val', 'var(--teal)');
     const obs = document.getElementById(oid); if (obs) obs.value = d?.[odb] || '';
   });
-  [['mat-tenues','mat_tenues'],['mat-equipement-comp','mat_equipement_comp'],['mat-equipement-analyse','mat_equipement_analyse'],['mat-medical','mat_medical']].forEach(([hid, dbk]) => {
+  [['mat-equipement-comp','mat_equipement_comp'],['mat-equipement-analyse','mat_equipement_analyse'],['mat-medical','mat_medical']].forEach(([hid, dbk]) => {
     const el = document.getElementById(hid); if (el) el.value = d?.[dbk] || 'Conforme';
   });
-  [['mat-tenues-obs','mat_tenues_obs'],['mat-equipement-comp-obs','mat_equipement_comp_obs'],['mat-equipement-analyse-obs','mat_equipement_analyse_obs'],['mat-medical-obs','mat_medical_obs'],
+  [['mat-equipement-comp-obs','mat_equipement_comp_obs'],['mat-equipement-analyse-obs','mat_equipement_analyse_obs'],['mat-medical-obs','mat_medical_obs'],
    ['log-observations','log_observations'],['ps-objectifs-groupe','objectifs_groupe'],['ps-scenarios-anticipes','scenarios_anticipes'],['ps-plans-contingence','plans_contingence'],
    ['ps-composition-staff','composition_staff'],['ps-roles-responsabilites','roles_responsabilites'],['ps-points-attention-staff','points_attention_staff'],['ps-observations-generales','observations_generales']
   ].forEach(([hid, dbk]) => { const el = document.getElementById(hid); if (el) el.value = d?.[dbk] || ''; });
@@ -2010,7 +2063,6 @@ async function savePrecompStaff() {
     groupe_forme_generale: gi('groupe-forme-generale'), groupe_forme_obs: g('groupe-forme-obs'),
     groupe_motivation: gi('groupe-motivation'), groupe_motivation_obs: g('groupe-motivation-obs'),
     groupe_cohesion: gi('groupe-cohesion'), groupe_cohesion_obs: g('groupe-cohesion-obs'),
-    mat_tenues: g('mat-tenues'), mat_tenues_obs: g('mat-tenues-obs'),
     mat_equipement_comp: g('mat-equipement-comp'), mat_equipement_comp_obs: g('mat-equipement-comp-obs'),
     mat_equipement_analyse: g('mat-equipement-analyse'), mat_equipement_analyse_obs: g('mat-equipement-analyse-obs'),
     mat_medical: g('mat-medical'), mat_medical_obs: g('mat-medical-obs'),
@@ -2040,7 +2092,7 @@ function renderStars(containerId, key, currentVal) {
 }
 
 async function loadPostcompPerformances() {
-  const { data } = await sb.from('results').select('*, events(epreuve, tour, temps_engagement, date_epreuve, athletes(prenom, nom))').eq('competition_id', activeCompId).eq('a_nage', true);
+  const { data } = await sb.from('results').select('*, events(epreuve, tour, temps_engagement, ranking_initial, date_epreuve, athletes(prenom, nom))').eq('competition_id', activeCompId).eq('a_nage', true);
   const container = document.getElementById('postcomp-staff-perf-table'); if (!container) return;
   if (!data?.length) { container.innerHTML = '<div style="color:var(--hint);font-size:13px">Aucun résultat enregistré</div>'; return; }
   const toSec = t => { if (!t) return null; const p = t.split(':'); return p.length===2 ? parseFloat(p[0])*60+parseFloat(p[1]) : parseFloat(t); };
@@ -2074,10 +2126,10 @@ function fillPostcompStaffForm(d) {
   [['enc-reunion-equipe','enc_reunion_equipe'],['enc-briefing-staff','enc_briefing_staff'],['enc-briefing-nageurs','enc_briefing_nageurs'],
    ['enc-protocoles-medicaux','enc_protocoles_medicaux'],['enc-retour-experience','enc_retour_experience'],
   ].forEach(([hid,dbk]) => { const el=document.getElementById(hid); if(el) el.checked=d?.[dbk]||false; });
-  [['pcs-mat-tenues','log_mat_tenues'],['pcs-mat-equipement-comp','log_mat_equipement_comp'],['pcs-mat-equipement-analyse','log_mat_equipement_analyse'],['pcs-mat-medical','log_mat_medical']].forEach(([hid,dbk]) => {
+  [['pcs-mat-equipement-comp','log_mat_equipement_comp'],['pcs-mat-equipement-analyse','log_mat_equipement_analyse'],['pcs-mat-medical','log_mat_medical']].forEach(([hid,dbk]) => {
     const el=document.getElementById(hid); if(el) el.value=d?.[dbk]||'Conforme';
   });
-  [['pcs-mat-tenues-obs','log_mat_tenues_obs'],['pcs-mat-equipement-comp-obs','log_mat_equipement_comp_obs'],['pcs-mat-equipement-analyse-obs','log_mat_equipement_analyse_obs'],['pcs-mat-medical-obs','log_mat_medical_obs']].forEach(([hid,dbk]) => {
+  [['pcs-mat-equipement-comp-obs','log_mat_equipement_comp_obs'],['pcs-mat-equipement-analyse-obs','log_mat_equipement_analyse_obs'],['pcs-mat-medical-obs','log_mat_medical_obs']].forEach(([hid,dbk]) => {
     const el=document.getElementById(hid); if(el) el.value=d?.[dbk]||'';
   });
   ['bilan-sportif','bilan-encadrement','bilan-logistique','bilan-deplacement','bilan-organisation'].forEach(name => {
@@ -2102,7 +2154,6 @@ async function savePostcompStaff() {
     enc_reunion_equipe: gc('enc-reunion-equipe'), enc_briefing_staff: gc('enc-briefing-staff'),
     enc_briefing_nageurs: gc('enc-briefing-nageurs'), enc_protocoles_medicaux: gc('enc-protocoles-medicaux'),
     enc_retour_experience: gc('enc-retour-experience'), enc_incidents: g('enc-incidents'), enc_observations: g('enc-observations'),
-    log_mat_tenues: g('pcs-mat-tenues'), log_mat_tenues_obs: g('pcs-mat-tenues-obs'),
     log_mat_equipement_comp: g('pcs-mat-equipement-comp'), log_mat_equipement_comp_obs: g('pcs-mat-equipement-comp-obs'),
     log_mat_equipement_analyse: g('pcs-mat-equipement-analyse'), log_mat_equipement_analyse_obs: g('pcs-mat-equipement-analyse-obs'),
     log_mat_medical: g('pcs-mat-medical'), log_mat_medical_obs: g('pcs-mat-medical-obs'),

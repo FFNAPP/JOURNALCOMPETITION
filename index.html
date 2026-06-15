@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FFN — Connexion</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/auth.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --navy:#0A1628; --blue:#1B4F8A; --blue-light:#2563C4;
+    --accent:#E8632A; --surface:#fff; --surface2:#F4F6FA;
+    --border:#DDE3EE; --text:#0A1628; --muted:#5A6478;
+    --error:#C0392B; --r:10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--surface2); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+
+  .header { background: var(--navy); padding: 0 1.5rem; display: flex; align-items: center; height: 52px; }
+  .header-logo { width: 28px; height: 28px; background: var(--accent); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; margin-right: 10px; }
+  .header-title { color: #fff; font-size: 14px; font-weight: 500; }
+
+  .login-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+  .login-card { background: var(--surface); border-radius: 14px; padding: 2.5rem 2rem; width: 100%; max-width: 400px; box-shadow: 0 4px 24px rgba(10,22,40,0.08); }
+  .login-logo { width: 48px; height: 48px; background: var(--navy); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 1.25rem; }
+  .login-title { font-size: 20px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
+  .login-sub { font-size: 13px; color: var(--muted); margin-bottom: 1.75rem; }
+
+  label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; margin-bottom: 4px; margin-top: 14px; }
+  input[type=email], input[type=password] {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; font-family: 'DM Sans', sans-serif; outline: none;
+    transition: border-color .15s;
+  }
+  input:focus { border-color: var(--blue-light); }
+
+  .btn-login {
+    width: 100%; margin-top: 1.5rem; padding: 11px;
+    background: var(--navy); color: #fff; border: none; border-radius: 8px;
+    font-size: 14px; font-weight: 600; font-family: 'DM Sans', sans-serif;
+    cursor: pointer; transition: background .15s;
+  }
+  .btn-login:hover { background: var(--blue); }
+
+  .error-msg { margin-top: 12px; padding: 10px 12px; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; color: var(--error); font-size: 13px; display: none; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">FFN</div>
+  <div class="header-title">Journal de compétition</div>
+</div>
+
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">FFN</div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé au staff technique FFN.</div>
+
+    <label for="email">Adresse e-mail</label>
+    <input type="email" id="email" placeholder="prenom.nom@ffnatation.fr" onkeydown="if(event.key==='Enter')login()">
+
+    <label for="password">Mot de passe</label>
+    <input type="password" id="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()">
+
+    <button class="btn-login" onclick="login()">Se connecter</button>
+    <div class="error-msg" id="login-error">Identifiants incorrects.</div>
+  </div>
+</div>
+
+<script>
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) location.href = (getRole(session) === 'dtn') ? 'admin.html' : 'journal.html';
+})();
+
+async function login() {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { errEl.style.display = 'block'; return; }
+  location.href = (getRole({ user: data.user }) === 'dtn') ? 'admin.html' : 'journal.html';
+}
+</script>
+</body>
+</html>

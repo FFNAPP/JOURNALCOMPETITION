@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FFN — Dashboard compétition</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/auth.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
@@ -36,6 +37,10 @@
     position: sticky; top: 0; z-index: 100;
   }
   .header-brand { display: flex; align-items: center; gap: 10px; }
+  .nav-bar { background: var(--navy); padding: 0 1.5rem 10px; display: flex; gap: 6px; align-items: center; position: sticky; top: 52px; z-index: 99; }
+  .nav-btn { background: none; border: none; color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 500; padding: 7px 14px; border-radius: 8px; cursor: pointer; text-decoration: none; font-family: 'DM Sans', sans-serif; transition: background .15s, color .15s; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+  .nav-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .nav-active { background: rgba(255,255,255,0.18) !important; color: #fff !important; font-weight: 600; }
   .header-logo { width: 28px; height: 28px; background: var(--accent); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; }
   .header-title { color: #fff; font-size: 14px; font-weight: 500; }
   .comp-select-header { display: flex; align-items: center; gap: 8px; }
@@ -150,17 +155,22 @@
 <div class="header">
   <div class="header-brand">
     <div class="header-logo">FFN</div>
-    <div class="header-title">Dashboard — Staff technique</div>
+    <div class="header-title" id="header-dashboard-title">Dashboard</div>
   </div>
-  <div class="comp-select-header">
-    <label>Compétition :</label>
-    <select id="header-comp-select" onchange="onCompChange()"><option value="">— Choisir —</option></select>
+  <div style="display:flex;gap:8px;align-items:center">
+    <div class="comp-select-header" style="margin:0">
+      <label>Compétition :</label>
+      <select id="header-comp-select" onchange="onCompChange()"><option value="">— Choisir —</option></select>
+    </div>
+    <button onclick="exportDashboardPDF()" style="background:none;border:none;color:rgba(255,255,255,0.8);cursor:pointer;font-size:13px;padding:6px 10px;border-radius:4px" title="Exporter PDF">📥</button>
+    <button onclick="openPasswordModal()" style="background:none;border:none;color:rgba(255,255,255,0.6);cursor:pointer;font-size:18px;padding:4px 8px;border-radius:6px;line-height:1" title="Modifier le mot de passe">🔑</button>
+    <button onclick="logout()" style="background:none;border:1px solid rgba(255,255,255,0.3);color:rgba(255,255,255,0.8);cursor:pointer;font-size:12px;font-weight:500;padding:5px 12px;border-radius:6px;font-family:'DM Sans',sans-serif">Déconnexion</button>
   </div>
-  <div style="display:flex;gap:12px">
-    <button onclick="exportDashboardPDF()" style="background:none;border:none;color:rgba(255,255,255,0.8);cursor:pointer;font-size:13px;font-weight:500;padding:8px 12px;border-radius:4px;transition:all.2s;display:flex;align-items:center;gap:6px" onmouseover="this.style.background='rgba(255,255,255,0.15)'" onmouseout="this.style.background='none'">
-      📥 PDF
-    </button>
-  </div>
+</div>
+<div class="nav-bar">
+  <a id="admin-link" href="admin.html" class="nav-btn" style="display:none">⚙️ Admin</a>
+  <a href="journal.html"   class="nav-btn">📓 Journal</a>
+  <a href="dashboard.html" class="nav-btn nav-active">📊 Dashboard</a>
 </div>
 
 <div class="tab-bar">
@@ -276,7 +286,7 @@
       </div>
       <div id="results-table-wrap" style="display:none">
         <table class="data-table">
-          <thead><tr><th>Nageur</th><th>Épreuve</th><th>Tour</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Réf.</th><th>Rang</th><th>Entraîneur</th><th>Observations</th></tr></thead>
+          <thead><tr><th>Nageur</th><th>Épreuve</th><th>Tour</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Réf.</th><th>Rang init.</th><th>Rang final</th><th>Δ places</th><th>Entraîneur</th><th>Observations</th></tr></thead>
           <tbody id="results-full-list"></tbody>
         </table>
       </div>
@@ -334,11 +344,8 @@
 </div>
 
 <script>
-const SUPABASE_URL = 'https://bpdxdljctybdmtemubjh.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwZHhkbGpjdHliZG10ZW11YmpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NzA2MTgsImV4cCI6MjA5NTU0NjYxOH0.b5GKWWTWTsrYPGmVPvexLWqAiQvkMl43Pzo96mz6lQw';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
 let activeCompId = null;
+let _dashRole = 'dtn', _dashCoachId = null;
 let allJournals = [], allResults = [], allNationObs = [], allEvents = [];
 let allStaffEntries = [], allPrecompStaff = [], allPostcompStaff = [];
 let filterDate = 'all', filterCoach = 'all';
@@ -346,6 +353,23 @@ let currentTab = 'synthese', currentStaffSubTab = 'comp';
 
 // ── INIT ─────────────────────────────────────────────────
 async function init() {
+  const session = await requireSession();
+  if (!session) return;
+  _dashRole = getRole(session);
+  _dashCoachId = getCoachId(session);
+
+  if (_dashRole === 'dtn') {
+    document.getElementById('admin-link').style.display = 'inline-block';
+  }
+
+  if (_dashRole === 'entraineur') {
+    document.getElementById('header-dashboard-title').textContent = 'Ma synthèse';
+    ['entraineurs','staff','rapport'].forEach(t => {
+      const btn = document.querySelector(`.tab-btn[onclick="showTab('${t}')"]`);
+      if (btn) btn.style.display = 'none';
+    });
+  }
+
   const { data } = await sb.from('competitions').select('*').order('date_debut', { ascending: false });
   const sel = document.getElementById('header-comp-select');
   (data || []).forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.nom; sel.appendChild(o); });
@@ -362,14 +386,24 @@ async function onCompChange() {
 }
 
 async function loadAllData() {
-  const [j, r, n, e, se, ps, pcs] = await Promise.all([
-    sb.from('journal_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree'),
-    sb.from('results').select('*, events(*, athletes(*)), coaches(*)').eq('competition_id', activeCompId),
-    sb.from('nation_observations').select('*, nations(*), coaches(*)').eq('competition_id', activeCompId),
+  const coachFilter = (_dashRole === 'entraineur' && _dashCoachId);
+  const jq = sb.from('journal_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree');
+  const rq = sb.from('results').select('*, events(*, athletes(*)), coaches(*)').eq('competition_id', activeCompId);
+  const nq = sb.from('nation_observations').select('*, nations(*), coaches(*)').eq('competition_id', activeCompId);
+  const seq = sb.from('staff_entries').select('*').eq('competition_id', activeCompId).order('date_entree');
+  const psq = sb.from('precomp_staff_entries').select('*').eq('competition_id', activeCompId).order('date_entree');
+  const pcsq = sb.from('postcomp_staff_entries').select('*').eq('competition_id', activeCompId);
+  if (coachFilter) {
+    jq.eq('coach_id', _dashCoachId);
+    rq.eq('coach_id', _dashCoachId);
+    nq.eq('coach_id', _dashCoachId);
+    seq.eq('coach_id', _dashCoachId);
+    psq.eq('coach_id', _dashCoachId);
+    pcsq.eq('coach_id', _dashCoachId);
+  }
+  const [j, r, n, e, se, ps, pcs] = await Promise.all([jq, rq, nq,
     sb.from('events').select('*, athletes(*)').eq('competition_id', activeCompId).order('date_epreuve').order('heure'),
-    sb.from('staff_entries').select('*').eq('competition_id', activeCompId).order('date_entree'),
-    sb.from('precomp_staff_entries').select('*').eq('competition_id', activeCompId).order('date_entree'),
-    sb.from('postcomp_staff_entries').select('*').eq('competition_id', activeCompId),
+    seq, psq, pcsq,
   ]);
   allJournals = j.data || [];
   allResults = r.data || [];
@@ -476,6 +510,15 @@ function computeResultStats(results, events) {
     nbPodium: podiums, pctPodium,
     engagementBattus, totalAvecEngagement: avecEngagement.length, pctEngagement
   };
+}
+
+function fmtDelta(rankingInitial, rangFinal) {
+  if (rankingInitial == null || !rangFinal) return '—';
+  const delta = rankingInitial - rangFinal;
+  if (delta === 0) return '<span style="color:var(--muted);font-size:11px;font-weight:600">= 0</span>';
+  const color = delta > 0 ? '#1A7A4A' : '#C0392B';
+  const sign  = delta > 0 ? '▲ +' : '▼ ';
+  return `<span style="color:${color};font-size:11px;font-weight:600">${sign}${delta}</span>`;
 }
 
 // Compare deux temps au format "1:02.34" ou "58.42" ou "1:02:34.56"
@@ -630,7 +673,9 @@ function renderResultats() {
             ${engBattu ? '<span style="color:var(--success);font-size:10px;margin-left:4px">↓ Réf.</span>' : ''}
           </td>
           <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.temps_engagement || '—'}</td>
+          <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.ranking_initial != null ? '#'+r.events.ranking_initial : '—'}</td>
           <td>${r.rang ? `<span class="badge ${podium ? 'badge-green' : r.rang <= 8 ? 'badge-orange' : 'badge-gray'}">${podium ? '🏅 ' : ''}${r.rang}</span>` : '—'}</td>
+          <td>${fmtDelta(r.events?.ranking_initial, r.rang)}</td>
           <td style="font-size:11px;color:var(--muted)">${r.coaches?.prenom} ${r.coaches?.nom}</td>
           <td style="font-size:11px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.observations || '—'}</td>
         </tr>`;
@@ -654,7 +699,7 @@ function renderResultats() {
   // ── Table complète ───────────────────────────────────────
   const tbody = document.getElementById('results-full-list');
   if (!results.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="empty">Aucun résultat</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="empty">Aucun résultat</td></tr>';
   } else {
     tbody.innerHTML = results.map(r => {
       const engBattu = r.a_nage && r.events?.temps_engagement && r.temps &&
@@ -667,7 +712,9 @@ function renderResultats() {
         <td>${r.a_nage ? '<span class="badge badge-green">✓</span>' : '<span class="badge badge-red">✕</span>'}</td>
         <td style="font-family:'DM Mono',monospace;font-weight:500">${r.temps || '—'}${engBattu ? ' <span style="color:var(--success);font-size:10px">↓</span>' : ''}</td>
         <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.temps_engagement || '—'}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.ranking_initial != null ? '#'+r.events.ranking_initial : '—'}</td>
         <td>${r.rang ? `<span class="badge ${r.rang<=3?'badge-green':r.rang<=8?'badge-orange':'badge-gray'}">${r.rang}</span>` : '—'}</td>
+        <td>${fmtDelta(r.events?.ranking_initial, r.rang)}</td>
         <td style="font-size:11px;color:var(--muted)">${r.coaches?.prenom} ${r.coaches?.nom}</td>
         <td style="font-size:11px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.observations || '—'}</td>
       </tr>`;
