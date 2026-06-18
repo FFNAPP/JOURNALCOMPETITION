@@ -295,6 +295,7 @@
   </div>
 
   <div class="main" id="tab-entraineurs" style="display:none">
+    <div id="coaches-forme-bandeau" style="margin-bottom:1.25rem"></div>
     <div id="coaches-detail-list"></div>
   </div>
 
@@ -732,6 +733,104 @@ function toggleResultsTable() {
 
 function renderEntraineurs() {
   const { journals } = getFiltered();
+
+  // Grouper par coach sur allJournals (non filtré par date) pour la tendance
+  const byCoachAll = {};
+  allJournals.forEach(j => {
+    const k = j.coach_id;
+    if (!byCoachAll[k]) byCoachAll[k] = { coach: j.coaches, entries: [] };
+    byCoachAll[k].entries.push(j);
+  });
+  Object.values(byCoachAll).forEach(c => {
+    c.entries.sort((a, b) => a.date_entree.localeCompare(b.date_entree));
+  });
+
+  // ── BANDEAU SYNTHÈSE ──────────────────────────────────────
+  const bandeau = document.getElementById('coaches-forme-bandeau');
+  const coachesAvecDonnees = Object.values(byCoachAll).filter(c =>
+    c.entries.some(j => j.forme_physique || j.forme_psychologique)
+  );
+
+  if (!coachesAvecDonnees.length) {
+    bandeau.innerHTML = '';
+  } else {
+    const scoreColor = s => s >= 3.5 ? 'var(--success)' : s >= 2.5 ? 'var(--accent2)' : 'var(--error)';
+    const jaugeBar = (val, color) => {
+      if (!val) return '<span style="color:var(--hint);font-size:11px">—</span>';
+      const pct = (val / 5) * 100;
+      return `<div style="display:flex;align-items:center;gap:6px">
+        <div style="width:80px;height:8px;background:var(--border);border-radius:4px;overflow:hidden;flex-shrink:0">
+          <div style="width:${pct}%;height:100%;background:${color};border-radius:4px;transition:width .3s"></div>
+        </div>
+        <span style="font-size:11px;color:var(--muted);min-width:20px">${val}/5</span>
+      </div>`;
+    };
+
+    const rows = coachesAvecDonnees.map(({ coach, entries }) => {
+      const withForme = entries.filter(j => j.forme_physique || j.forme_psychologique);
+      const last = withForme[withForme.length - 1];
+      const scoreOf = j => {
+        const vals = [j.forme_physique, j.forme_psychologique].filter(v => v);
+        return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+      };
+      const lastScore = scoreOf(last);
+      const color = lastScore ? scoreColor(lastScore) : 'var(--hint)';
+
+      let tendance = '—', tendanceColor = 'var(--hint)';
+      if (withForme.length >= 2) {
+        const recent = withForme.slice(-2).map(scoreOf).filter(v => v !== null);
+        const older  = withForme.slice(-4, -2).map(scoreOf).filter(v => v !== null);
+        if (recent.length && older.length) {
+          const diff = recent.reduce((a,b)=>a+b,0)/recent.length - older.reduce((a,b)=>a+b,0)/older.length;
+          if (diff > 0.4)       { tendance = '↑'; tendanceColor = 'var(--success)'; }
+          else if (diff < -0.4) { tendance = '↓'; tendanceColor = 'var(--error)'; }
+          else                  { tendance = '→'; tendanceColor = 'var(--muted)'; }
+        } else if (withForme.length === 2) {
+          const s1 = scoreOf(withForme[0]), s2 = scoreOf(withForme[1]);
+          if (s1 !== null && s2 !== null) {
+            const diff = s2 - s1;
+            if (diff > 0.4)       { tendance = '↑'; tendanceColor = 'var(--success)'; }
+            else if (diff < -0.4) { tendance = '↓'; tendanceColor = 'var(--error)'; }
+            else                  { tendance = '→'; tendanceColor = 'var(--muted)'; }
+          }
+        }
+      }
+
+      return `<div style="display:grid;grid-template-columns:160px 1fr 1fr 80px 48px;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border)">
+        <div style="font-size:13px;font-weight:500;color:var(--navy)">${coach.prenom} ${coach.nom}</div>
+        <div>
+          <div style="font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Physique</div>
+          ${jaugeBar(last?.forme_physique, scoreColor(last?.forme_physique || 0))}
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Psychologique</div>
+          ${jaugeBar(last?.forme_psychologique, scoreColor(last?.forme_psychologique || 0))}
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Moy.</div>
+          <div style="font-size:16px;font-weight:600;color:${color};font-family:'DM Mono',monospace">${lastScore ? lastScore.toFixed(1) : '—'}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Tend.</div>
+          <div style="font-size:20px;color:${tendanceColor};line-height:1">${tendance}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    const lastDate = coachesAvecDonnees
+      .flatMap(c => c.entries.filter(j => j.forme_physique || j.forme_psychologique))
+      .map(j => j.date_entree).sort().pop();
+
+    bandeau.innerHTML = `<div class="card">
+      <div class="card-head">
+        <div class="card-title">État de forme — vue d'ensemble</div>
+        <div class="card-sub">Dernier jour saisi${lastDate ? ' · ' + fmtDate(lastDate) : ''}</div>
+      </div>
+      <div style="padding:0">${rows}</div>
+    </div>`;
+  }
+
+  // ── DÉTAIL PAR ENTRAÎNEUR (inchangé) ─────────────────────
   const byCoach = {};
   journals.forEach(j => {
     const k = j.coach_id;
