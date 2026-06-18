@@ -1959,12 +1959,29 @@ function fillVoyageForm(d) {
     document.querySelectorAll('input[name="voyage-ambiance"]').forEach(r => r.checked = (r.value === d.ambiance_groupe));
   }
   const inc = document.getElementById('voy-incidents'); if (inc) inc.value = d?.incidents || '';
+  // Embarquement
+  const embNC = document.getElementById('voy-embarquement-nc');
+  const embWrap = document.getElementById('voy-embarquement-wrap');
+  const emb = document.getElementById('voy-embarquement');
+  if (embNC) { embNC.checked = (d?.embarquement == null); if (embWrap) embWrap.style.display = d?.embarquement == null ? 'none' : ''; }
+  if (emb && d?.embarquement != null) { emb.value = d.embarquement; updateSlider(emb,'voy-embarquement-val'); }
+  // Attente
+  if (d?.attente) document.querySelectorAll('input[name="voy-attente"]').forEach(r => r.checked = (r.value === d.attente));
+  // Problème admin
+  if (d?.probleme_admin) {
+    document.querySelectorAll('input[name="voy-pb-admin"]').forEach(r => r.checked = (r.value === d.probleme_admin));
+    const obs = document.getElementById('voy-pb-admin-obs');
+    if (obs) { obs.value = d.probleme_admin_obs || ''; obs.style.display = d.probleme_admin === 'oui' ? '' : 'none'; }
+  }
   updateSaveStatus(d?.updated_at);
 }
 
 async function saveVoyage() {
   const typeJournee = document.querySelector('input[name="voyage-type"]:checked')?.value || null;
   const ambiance    = document.querySelector('input[name="voyage-ambiance"]:checked')?.value || null;
+  const embNC       = document.getElementById('voy-embarquement-nc')?.checked;
+  const attente     = document.querySelector('input[name="voy-attente"]:checked')?.value || null;
+  const pbAdmin     = document.querySelector('input[name="voy-pb-admin"]:checked')?.value || null;
   const payload = {
     competition_id: activeCompId, coach_id: activeCoachId, date_entree: currentDate,
     type_journee: typeJournee,
@@ -1972,6 +1989,10 @@ async function saveVoyage() {
     forme_psychologique: parseInt(document.getElementById('voy-forme-psychologique')?.value || 3),
     qualite_voyage: parseInt(document.getElementById('voy-qualite-voyage')?.value || 3),
     ambiance_groupe: ambiance,
+    embarquement: embNC ? null : parseInt(document.getElementById('voy-embarquement')?.value || 3),
+    attente,
+    probleme_admin: pbAdmin,
+    probleme_admin_obs: pbAdmin === 'oui' ? (document.getElementById('voy-pb-admin-obs')?.value || '') : null,
     incidents: document.getElementById('voy-incidents')?.value || '',
   };
   let error;

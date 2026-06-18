@@ -360,25 +360,42 @@ let currentTab = 'synthese', currentStaffSubTab = 'comp';
 async function init() {
   const session = await requireSession();
   if (!session) return;
-  _dashRole = getRole(session);
+  _dashRole    = getRole(session);
   _dashCoachId = getCoachId(session);
 
   if (_dashRole === 'dtn') {
     document.getElementById('admin-link').style.display = 'inline-block';
   }
 
-  if (_dashRole === 'entraineur') {
-    document.getElementById('header-dashboard-title').textContent = 'Ma synthèse';
-    ['entraineurs','staff','rapport'].forEach(t => {
-      const btn = document.querySelector(`.tab-btn[onclick="showTab('${t}')"]`);
-      if (btn) btn.style.display = 'none';
-    });
+  if (_dashRole !== 'dtn') {
+    document.querySelector('[onclick="showTab(\'staff\')"]')?.style.setProperty('display', 'none');
+    document.querySelector('[onclick="showTab(\'rapport\')"]')?.style.setProperty('display', 'none');
   }
 
-  const { data } = await sb.from('competitions').select('*').order('date_debut', { ascending: false });
+  // Charger les compétitions selon le rôle
+  let comps;
+  if (_dashRole === 'dtn') {
+    const { data } = await sb.from('competitions').select('*').order('date_debut', { ascending: false });
+    comps = data || [];
+  } else {
+    const { data } = await sb
+      .from('competition_coaches')
+      .select('competition_id, competitions(*)')
+      .eq('coach_id', _dashCoachId);
+    comps = (data || [])
+      .map(r => r.competitions)
+      .filter(Boolean)
+      .sort((a, b) => (b.date_debut || '').localeCompare(a.date_debut || ''));
+  }
+
   const sel = document.getElementById('header-comp-select');
-  (data || []).forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.nom; sel.appendChild(o); });
-  if (data && data.length) { sel.value = data[0].id; onCompChange(); }
+  comps.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id;
+    o.textContent = c.nom;
+    sel.appendChild(o);
+  });
+  if (comps.length) { sel.value = comps[0].id; onCompChange(); }
 }
 
 async function onCompChange() {
@@ -391,33 +408,22 @@ async function onCompChange() {
 }
 
 async function loadAllData() {
-  const coachFilter = (_dashRole === 'entraineur' && _dashCoachId);
-  const jq = sb.from('journal_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree');
-  const rq = sb.from('results').select('*, events(*, athletes(*)), coaches(*)').eq('competition_id', activeCompId);
-  const nq = sb.from('nation_observations').select('*, nations(*), coaches(*)').eq('competition_id', activeCompId);
-  const seq = sb.from('staff_entries').select('*').eq('competition_id', activeCompId).order('date_entree');
-  const psq = sb.from('precomp_staff_entries').select('*').eq('competition_id', activeCompId).order('date_entree');
-  const pcsq = sb.from('postcomp_staff_entries').select('*').eq('competition_id', activeCompId);
-  if (coachFilter) {
-    jq.eq('coach_id', _dashCoachId);
-    rq.eq('coach_id', _dashCoachId);
-    nq.eq('coach_id', _dashCoachId);
-    seq.eq('coach_id', _dashCoachId);
-    psq.eq('coach_id', _dashCoachId);
-    pcsq.eq('coach_id', _dashCoachId);
-  }
-  const voyq = sb.from('voyage_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree');
-  if (coachFilter) voyq.eq('coach_id', _dashCoachId);
-  const [j, r, n, e, se, ps, pcs, voy] = await Promise.all([jq, rq, nq,
+  const [j, r, n, e, se, ps, pcs, voy] = await Promise.all([
+    applyCoachFilter(sb.from('journal_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
+    sb.from('results').select('*, events(*, athletes(*)), coaches(*)').eq('competition_id', activeCompId), // non filtré : vue collective
+    applyCoachFilter(sb.from('nation_observations').select('*, nations(*), coaches(*)').eq('competition_id', activeCompId)),
     sb.from('events').select('*, athletes(*)').eq('competition_id', activeCompId).order('date_epreuve').order('heure'),
-    seq, psq, pcsq, voyq,
+    applyCoachFilter(sb.from('staff_entries').select('*').eq('competition_id', activeCompId).order('date_entree')),
+    applyCoachFilter(sb.from('precomp_staff_entries').select('*').eq('competition_id', activeCompId).order('date_entree')),
+    applyCoachFilter(sb.from('postcomp_staff_entries').select('*').eq('competition_id', activeCompId)),
+    applyCoachFilter(sb.from('voyage_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
   ]);
-  allJournals = j.data || [];
-  allResults = r.data || [];
-  allNationObs = n.data || [];
-  allEvents = e.data || [];
-  allStaffEntries = se.data || [];
-  allPrecompStaff = ps.data || [];
+  allJournals      = j.data   || [];
+  allResults       = r.data   || [];
+  allNationObs     = n.data   || [];
+  allEvents        = e.data   || [];
+  allStaffEntries  = se.data  || [];
+  allPrecompStaff  = ps.data  || [];
   allPostcompStaff = pcs.data || [];
   allVoyageEntries = voy.data || [];
   buildFilters();
@@ -473,6 +479,11 @@ function getFiltered() {
     nationObs = nationObs.filter(n => n.coach_id === filterCoach);
   }
   return { journals, results, nationObs };
+}
+
+function applyCoachFilter(query) {
+  if (_dashRole !== 'dtn') return query.eq('coach_id', _dashCoachId);
+  return query;
 }
 
 // ── CALCUL DES STATISTIQUES DE RÉSULTATS ──────────────────
@@ -1325,6 +1336,13 @@ function renderStaffVoyage() {
   const aller  = allVoyageEntries.filter(e => e.type_journee === 'aller');
   const retour = allVoyageEntries.filter(e => e.type_journee === 'retour');
 
+  const pbBadge = v => {
+    if (!v) return '';
+    return v === 'oui'
+      ? '<span class="badge badge-red">⚠️ Problème admin</span>'
+      : '<span class="badge badge-gray">Pas de problème admin</span>';
+  };
+
   const renderSection = (entries, titre) => {
     if (!entries.length) return `<div style="color:var(--hint);font-size:12px;padding:8px 0">${titre} : aucune donnée</div>`;
     return `<div style="margin-bottom:1.5rem">
@@ -1338,21 +1356,30 @@ function renderStaffVoyage() {
             </div>
             ${ambianceBadge(e.ambiance_groupe)}
           </div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:500;color:var(--hint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Forme personnelle</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">
             <div>
-              <div style="font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Forme physique</div>
+              <div style="font-size:10px;color:var(--hint);margin-bottom:4px">Physique</div>
               ${miniBar(e.forme_physique, scoreColor(e.forme_physique))}
             </div>
             <div>
-              <div style="font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Forme psycho.</div>
+              <div style="font-size:10px;color:var(--hint);margin-bottom:4px">Psychologique</div>
               ${miniBar(e.forme_psychologique, scoreColor(e.forme_psychologique))}
             </div>
             <div>
-              <div style="font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Qualité voyage</div>
+              <div style="font-size:10px;color:var(--hint);margin-bottom:4px">Qualité voyage</div>
               ${miniBar(e.qualite_voyage, scoreColor(e.qualite_voyage))}
             </div>
           </div>
-          ${e.attente ? `<div style="font-size:11px;color:var(--muted);margin-bottom:4px">⏱ Attente : <strong>${e.attente}</strong></div>` : ''}
+          ${(e.embarquement != null || e.attente || e.probleme_admin) ? `
+          <div style="font-size:11px;font-weight:500;color:var(--hint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Conditions du voyage</div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px">
+            ${e.embarquement != null ? `<div><div style="font-size:10px;color:var(--hint);margin-bottom:4px">Embarquement</div>${miniBar(e.embarquement, scoreColor(e.embarquement))}</div>` : ''}
+            ${e.attente ? `<div><div style="font-size:10px;color:var(--hint);margin-bottom:4px">Attente</div><span style="font-size:12px;font-weight:500">⏱ ${e.attente}</span></div>` : ''}
+            ${e.probleme_admin ? `<div>${pbBadge(e.probleme_admin)}</div>` : ''}
+          </div>
+          ${e.probleme_admin === 'oui' && e.probleme_admin_obs ? `<div style="font-size:12px;color:var(--muted);margin-bottom:6px">${e.probleme_admin_obs}</div>` : ''}
+          ` : ''}
           ${e.incidents ? `<div style="font-size:12px;color:var(--accent);border-left:2px solid var(--accent);padding-left:8px;margin-top:6px">${e.incidents}</div>` : ''}
         </div>`).join('')}
     </div>`;
