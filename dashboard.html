@@ -194,10 +194,12 @@
     <span class="filter-label">Filtre jour :</span>
     <button class="filter-btn active" onclick="filterByDate('all', this)">Tous les jours</button>
     <div id="date-filters"></div>
-    <div class="filter-sep"></div>
-    <span class="filter-label">Entraîneur :</span>
-    <button class="filter-btn active" onclick="filterByCoach('all', this)">Tous</button>
-    <div id="coach-filters"></div>
+    <div id="coach-filter-group" style="display:contents">
+      <div class="filter-sep"></div>
+      <span class="filter-label">Entraîneur :</span>
+      <button class="filter-btn active" onclick="filterByCoach('all', this)">Tous</button>
+      <div id="coach-filters"></div>
+    </div>
   </div>
 
   <div class="main" id="tab-synthese">
@@ -330,10 +332,12 @@
         <button class="subtab-btn active" onclick="showStaffSubTab('comp')">Compétition</button>
         <button class="subtab-btn" onclick="showStaffSubTab('precomp')">Pré-compétition</button>
         <button class="subtab-btn" onclick="showStaffSubTab('postcomp')">Bilan post-comp</button>
+        <button class="subtab-btn" onclick="showStaffSubTab('voyage')">✈️ Voyage</button>
       </div>
       <div id="staff-subtab-comp" style="padding:0"></div>
       <div id="staff-subtab-precomp" style="padding:0;display:none"></div>
       <div id="staff-subtab-postcomp" style="padding:0;display:none"></div>
+      <div id="staff-subtab-voyage" style="padding:0;display:none"></div>
     </div>
   </div>
 
@@ -348,7 +352,7 @@
 let activeCompId = null;
 let _dashRole = 'dtn', _dashCoachId = null;
 let allJournals = [], allResults = [], allNationObs = [], allEvents = [];
-let allStaffEntries = [], allPrecompStaff = [], allPostcompStaff = [];
+let allStaffEntries = [], allPrecompStaff = [], allPostcompStaff = [], allVoyageEntries = [];
 let filterDate = 'all', filterCoach = 'all';
 let currentTab = 'synthese', currentStaffSubTab = 'comp';
 
@@ -402,9 +406,11 @@ async function loadAllData() {
     psq.eq('coach_id', _dashCoachId);
     pcsq.eq('coach_id', _dashCoachId);
   }
-  const [j, r, n, e, se, ps, pcs] = await Promise.all([jq, rq, nq,
+  const voyq = sb.from('voyage_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree');
+  if (coachFilter) voyq.eq('coach_id', _dashCoachId);
+  const [j, r, n, e, se, ps, pcs, voy] = await Promise.all([jq, rq, nq,
     sb.from('events').select('*, athletes(*)').eq('competition_id', activeCompId).order('date_epreuve').order('heure'),
-    seq, psq, pcsq,
+    seq, psq, pcsq, voyq,
   ]);
   allJournals = j.data || [];
   allResults = r.data || [];
@@ -413,6 +419,7 @@ async function loadAllData() {
   allStaffEntries = se.data || [];
   allPrecompStaff = ps.data || [];
   allPostcompStaff = pcs.data || [];
+  allVoyageEntries = voy.data || [];
   buildFilters();
 }
 
@@ -426,6 +433,11 @@ function buildFilters() {
   const coaches = [...new Map(allJournals.map(j => [j.coach_id, j.coaches])).entries()];
   const cf = document.getElementById('coach-filters');
   cf.innerHTML = coaches.map(([id, c]) => `<button class="filter-btn" onclick="filterByCoach('${id}', this)">${c.prenom} ${c.nom}</button>`).join('');
+
+  // Masquer le filtre coach si l'utilisateur n'est pas DTN
+  if (_dashRole !== 'dtn') {
+    document.getElementById('coach-filter-group').style.display = 'none';
+  }
 }
 
 function filterByDate(date, btn) {
@@ -1152,12 +1164,12 @@ function showTab(tab) {
 // ── STAFF TAB ────────────────────────────────────────────
 function showStaffSubTab(tab) {
   currentStaffSubTab = tab;
-  ['comp','precomp','postcomp'].forEach(t => {
+  ['comp','precomp','postcomp','voyage'].forEach(t => {
     const el = document.getElementById('staff-subtab-' + t);
     if (el) el.style.display = t === tab ? '' : 'none';
   });
   document.querySelectorAll('.subtab-btn').forEach((b, i) => {
-    b.classList.toggle('active', ['comp','precomp','postcomp'][i] === tab);
+    b.classList.toggle('active', ['comp','precomp','postcomp','voyage'][i] === tab);
   });
   renderStaffSubTab();
 }
@@ -1166,6 +1178,7 @@ function renderStaffSubTab() {
   if (currentStaffSubTab === 'comp') renderStaffComp();
   else if (currentStaffSubTab === 'precomp') renderStaffPrecomp();
   else if (currentStaffSubTab === 'postcomp') renderStaffPostcomp();
+  else if (currentStaffSubTab === 'voyage') renderStaffVoyage();
 }
 
 function renderStaffComp() {
@@ -1282,6 +1295,72 @@ function renderStaffPostcomp() {
       ${e.recommandations_orga?`<div><div style="font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Recommandations organisationnelles</div><div style="font-size:13px">${e.recommandations_orga}</div></div>`:''}
     </div>`:''}
     ${e.conclusions_dtn?`<div style="background:var(--surface2);border-radius:8px;padding:12px;border-left:3px solid var(--teal)"><div style="font-size:11px;font-weight:600;color:var(--teal);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Conclusions DTN</div><div style="font-size:13px">${e.conclusions_dtn}</div></div>`:''}
+  </div>`;
+}
+
+function renderStaffVoyage() {
+  const c = document.getElementById('staff-subtab-voyage');
+  if (!allVoyageEntries.length) {
+    c.innerHTML = '<div class="empty">Aucune donnée de voyage saisie</div>';
+    return;
+  }
+
+  const scoreColor = s => !s ? 'var(--hint)' : s >= 4 ? 'var(--success)' : s >= 3 ? 'var(--accent2)' : 'var(--error)';
+  const miniBar = (val, color) => {
+    if (!val) return '<span style="color:var(--hint)">—</span>';
+    const pct = (val / 5) * 100;
+    return `<div style="display:flex;align-items:center;gap:5px">
+      <div style="width:60px;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${color};border-radius:3px"></div>
+      </div>
+      <span style="font-size:11px;color:var(--muted)">${val}/5</span>
+    </div>`;
+  };
+  const ambianceBadge = v => {
+    if (!v) return '—';
+    const map = { 'Excellente':'badge-green','Bonne':'badge-blue','Correcte':'badge-gray','Tendue':'badge-orange','Difficile':'badge-red' };
+    return `<span class="badge ${map[v]||'badge-gray'}">${v}</span>`;
+  };
+
+  const aller  = allVoyageEntries.filter(e => e.type_journee === 'aller');
+  const retour = allVoyageEntries.filter(e => e.type_journee === 'retour');
+
+  const renderSection = (entries, titre) => {
+    if (!entries.length) return `<div style="color:var(--hint);font-size:12px;padding:8px 0">${titre} : aucune donnée</div>`;
+    return `<div style="margin-bottom:1.5rem">
+      <div style="font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">${titre}</div>
+      ${entries.map(e => `
+        <div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div>
+              <span style="font-size:13px;font-weight:500;color:var(--navy)">${e.coaches?.prenom||''} ${e.coaches?.nom||''}</span>
+              <span style="font-size:11px;color:var(--muted);margin-left:8px">${fmtDate(e.date_entree)}</span>
+            </div>
+            ${ambianceBadge(e.ambiance_groupe)}
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:8px">
+            <div>
+              <div style="font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Forme physique</div>
+              ${miniBar(e.forme_physique, scoreColor(e.forme_physique))}
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Forme psycho.</div>
+              ${miniBar(e.forme_psychologique, scoreColor(e.forme_psychologique))}
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Qualité voyage</div>
+              ${miniBar(e.qualite_voyage, scoreColor(e.qualite_voyage))}
+            </div>
+          </div>
+          ${e.attente ? `<div style="font-size:11px;color:var(--muted);margin-bottom:4px">⏱ Attente : <strong>${e.attente}</strong></div>` : ''}
+          ${e.incidents ? `<div style="font-size:12px;color:var(--accent);border-left:2px solid var(--accent);padding-left:8px;margin-top:6px">${e.incidents}</div>` : ''}
+        </div>`).join('')}
+    </div>`;
+  };
+
+  c.innerHTML = `<div style="padding:14px">
+    ${renderSection(aller, '✈️ Voyage aller')}
+    ${renderSection(retour, '🏠 Voyage retour')}
   </div>`;
 }
 
