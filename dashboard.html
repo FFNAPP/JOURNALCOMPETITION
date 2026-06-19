@@ -212,6 +212,8 @@
       <div class="kpi-card green"><div class="kpi-label">Taux de saisie</div><div class="kpi-value" id="kpi-fill">—</div><div class="kpi-sub">journaux / jours</div></div>
     </div>
 
+    <div id="synthese-forme-bandeau" style="margin-bottom:1.25rem"></div>
+
     <div class="grid-2">
       <!-- Résumé entraîneurs du jour -->
       <div class="card">
@@ -592,6 +594,80 @@ function renderSynthese() {
   document.getElementById('kpi-athletes').textContent = uniqueAthletes || '—';
   document.getElementById('kpi-events').textContent = todayEvents || '—';
   document.getElementById('kpi-fill').textContent = total ? Math.round(days / total * 100) + '%' : '—';
+
+  // ── FORME ENTRAÎNEURS (bandeau synthèse) ─────────────────
+  const synthFormeBandeau = document.getElementById('synthese-forme-bandeau');
+  if (synthFormeBandeau) {
+    const formeByCoachS = {};
+    const ensureCoachS = (id, obj) => { if (!formeByCoachS[id]) formeByCoachS[id] = { coach: obj, points: [] }; };
+    allJournals.forEach(j => {
+      if (!j.forme_physique && !j.forme_psychologique) return;
+      ensureCoachS(j.coach_id, j.coaches);
+      formeByCoachS[j.coach_id].points.push({ date: j.date_entree, phys: j.forme_physique, psy: j.forme_psychologique, source: 'comp' });
+    });
+    allVoyageEntries.forEach(v => {
+      if (!v.forme_physique && !v.forme_psychologique) return;
+      ensureCoachS(v.coach_id, v.coaches);
+      formeByCoachS[v.coach_id].points.push({ date: v.date_entree, phys: v.forme_physique, psy: v.forme_psychologique, source: 'voyage' });
+    });
+    allPrecompEntries.forEach(p => {
+      if (!p.coach_forme_physique && !p.coach_forme_psychologique) return;
+      ensureCoachS(p.coach_id, p.coaches);
+      formeByCoachS[p.coach_id].points.push({ date: p.date_entree, phys: p.coach_forme_physique, psy: p.coach_forme_psychologique, source: 'precomp' });
+    });
+    Object.values(formeByCoachS).forEach(c => c.points.sort((a, b) => a.date.localeCompare(b.date)));
+    const coachesAvecDonneesS = Object.values(formeByCoachS).filter(c => c.points.length > 0);
+
+    if (!coachesAvecDonneesS.length) {
+      synthFormeBandeau.innerHTML = '';
+    } else {
+      const scoreColorS = s => s >= 3.5 ? 'var(--success)' : s >= 2.5 ? 'var(--accent2)' : 'var(--error)';
+      const jaugeS = (val, color) => {
+        if (!val) return '<span style="color:var(--hint);font-size:11px">—</span>';
+        const pct = (val / 5) * 100;
+        return `<div style="display:flex;align-items:center;gap:6px">
+          <div style="width:64px;height:7px;background:var(--border);border-radius:4px;overflow:hidden;flex-shrink:0">
+            <div style="width:${pct}%;height:100%;background:${color};border-radius:4px"></div>
+          </div>
+          <span style="font-size:11px;color:var(--muted)">${val}/5</span>
+        </div>`;
+      };
+      const srcLabel = s => s === 'voyage' ? 'Voyage' : s === 'precomp' ? 'Pré-comp' : 'Comp.';
+      const rows = coachesAvecDonneesS.map(({ coach, points }) => {
+        const last = points[points.length - 1];
+        const avg = [last.phys, last.psy].filter(v => v);
+        const score = avg.length ? (avg.reduce((a, b) => a + b, 0) / avg.length) : null;
+        const col = score ? scoreColorS(score) : 'var(--hint)';
+        return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 60px;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-size:13px;font-weight:500;color:var(--navy)">${coach.prenom} ${coach.nom}</div>
+            <div style="font-size:10px;color:var(--hint);margin-top:1px">${fmtDate(last.date)} · ${srcLabel(last.source)}</div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Physique</div>
+            ${jaugeS(last.phys, scoreColorS(last.phys || 0))}
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Psychologique</div>
+            ${jaugeS(last.psy, scoreColorS(last.psy || 0))}
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Moy.</div>
+            <div style="font-size:15px;font-weight:600;color:${col};font-family:'DM Mono',monospace">${score ? score.toFixed(1) : '—'}</div>
+          </div>
+        </div>`;
+      }).join('');
+      synthFormeBandeau.innerHTML = `<div class="card">
+        <div class="card-head">
+          <div class="card-title">Forme des entraîneurs</div>
+          <div class="card-sub">
+            <button onclick="showTab('entraineurs')" style="background:none;border:none;color:var(--blue-light);cursor:pointer;font-size:11px;padding:0">Voir le détail →</button>
+          </div>
+        </div>
+        <div style="padding:0">${rows}</div>
+      </div>`;
+    }
+  }
 
   // État entraîneurs
   const coachesList = document.getElementById('coaches-etat-list');
