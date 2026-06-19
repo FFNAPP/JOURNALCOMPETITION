@@ -375,12 +375,9 @@ async function init() {
     document.querySelector('[onclick="showTab(\'rapport\')"]')?.style.setProperty('display', 'none');
   }
 
-  // Charger les compétitions selon le rôle
+  // Charger les compétitions selon le rôle — tous les rôles filtrés par competition_coaches
   let comps;
-  if (_dashRole === 'dtn') {
-    const { data } = await sb.from('competitions').select('*').order('date_debut', { ascending: false });
-    comps = data || [];
-  } else {
+  if (_dashCoachId) {
     const { data } = await sb
       .from('competition_coaches')
       .select('competition_id, competitions(*)')
@@ -389,6 +386,10 @@ async function init() {
       .map(r => r.competitions)
       .filter(Boolean)
       .sort((a, b) => (b.date_debut || '').localeCompare(a.date_debut || ''));
+  } else {
+    // Fallback si coach_id absent (ne devrait pas arriver)
+    const { data } = await sb.from('competitions').select('*').order('date_debut', { ascending: false });
+    comps = data || [];
   }
 
   const sel = document.getElementById('header-comp-select');
