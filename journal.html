@@ -275,6 +275,34 @@
 
     <div class="section">
       <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num purple">★</div>
+        <div class="section-title">Mon état de forme <span style="font-weight:400;color:var(--hint);font-size:11px">(entraîneur)</span></div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div>
+          <label>Forme physique</label>
+          <div class="slider-row">
+            <div class="slider-label">Très basse</div>
+            <div class="slider-wrap"><input type="range" class="purple-thumb" id="pre-coach-forme-physique" min="1" max="5" value="3" oninput="updateSlider(this,'pre-coach-forme-physique-val')"></div>
+            <div class="slider-val" id="pre-coach-forme-physique-val">3</div>
+            <div class="slider-label" style="text-align:right">Excellente</div>
+          </div>
+        </div>
+        <div>
+          <label>Forme psychologique</label>
+          <div class="slider-row">
+            <div class="slider-label">Très basse</div>
+            <div class="slider-wrap"><input type="range" class="purple-thumb" id="pre-coach-forme-psychologique" min="1" max="5" value="3" oninput="updateSlider(this,'pre-coach-forme-psychologique-val')"></div>
+            <div class="slider-val" id="pre-coach-forme-psychologique-val">3</div>
+            <div class="slider-label" style="text-align:right">Excellente</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
         <div class="section-num purple">A</div>
         <div class="section-title">Préparation physique — charges d'entraînement</div>
         <div class="section-chevron open">▾</div>
@@ -1599,7 +1627,7 @@ async function loadDayData(date) {
 
 // ── FILL PRÉ-COMP ──────────────────────────────────────────
 function fillPrecompForm(d) {
-  const sliders = ['pre-phys-charge','pre-phys-fatigue','pre-mental-motivation','pre-mental-confiance','pre-mental-anxiete','pre-forme-generale','pre-relation-qualite'];
+  const sliders = ['pre-coach-forme-physique','pre-coach-forme-psychologique','pre-phys-charge','pre-phys-fatigue','pre-mental-motivation','pre-mental-confiance','pre-mental-anxiete','pre-forme-generale','pre-relation-qualite'];
   sliders.forEach(id => {
     const el = document.getElementById(id); if (!el) return;
     const dbKey = id.replace(/^pre-/,'').replace(/-/g,'_');
@@ -2001,6 +2029,8 @@ async function savePrecomp() {
   const gi = id => parseInt(document.getElementById(id)?.value || 3);
   const payload = {
     competition_id: activeCompId, coach_id: activeCoachId, date_entree: currentDate,
+    coach_forme_physique: gi('pre-coach-forme-physique'),
+    coach_forme_psychologique: gi('pre-coach-forme-psychologique'),
     phys_charge: gi('pre-phys-charge'), phys_charge_obs: g('pre-phys-charge-obs'),
     phys_fatigue: gi('pre-phys-fatigue'), phys_fatigue_obs: g('pre-phys-fatigue-obs'),
     mental_motivation: gi('pre-mental-motivation'), mental_motivation_obs: g('pre-mental-motivation-obs'),
