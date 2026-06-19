@@ -298,6 +298,9 @@
 
   <div class="main" id="tab-entraineurs" style="display:none">
     <div id="coaches-forme-bandeau" style="margin-bottom:1.25rem"></div>
+    <div style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.75rem">Questionnaires pré-compétition</div>
+    <div id="coaches-precomp-list" style="margin-bottom:1.5rem"></div>
+    <div style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.75rem">Journal de compétition</div>
     <div id="coaches-detail-list"></div>
   </div>
 
@@ -352,7 +355,7 @@
 let activeCompId = null;
 let _dashRole = 'dtn', _dashCoachId = null;
 let allJournals = [], allResults = [], allNationObs = [], allEvents = [];
-let allStaffEntries = [], allPrecompStaff = [], allPostcompStaff = [], allVoyageEntries = [];
+let allStaffEntries = [], allPrecompStaff = [], allPostcompStaff = [], allVoyageEntries = [], allPrecompEntries = [];
 let filterDate = 'all', filterCoach = 'all';
 let currentTab = 'synthese', currentStaffSubTab = 'comp';
 
@@ -408,24 +411,26 @@ async function onCompChange() {
 }
 
 async function loadAllData() {
-  const [j, r, n, e, se, ps, pcs, voy] = await Promise.all([
+  const [j, r, n, e, se, ps, pcs, voy, pc] = await Promise.all([
     applyCoachFilter(sb.from('journal_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
-    sb.from('results').select('*, events(*, athletes(*)), coaches(*)').eq('competition_id', activeCompId), // non filtré : vue collective
+    sb.from('results').select('*, events(*, athletes(*)), coaches(*)').eq('competition_id', activeCompId),
     applyCoachFilter(sb.from('nation_observations').select('*, nations(*), coaches(*)').eq('competition_id', activeCompId)),
     sb.from('events').select('*, athletes(*)').eq('competition_id', activeCompId).order('date_epreuve').order('heure'),
     applyCoachFilter(sb.from('staff_entries').select('*').eq('competition_id', activeCompId).order('date_entree')),
     applyCoachFilter(sb.from('precomp_staff_entries').select('*').eq('competition_id', activeCompId).order('date_entree')),
     applyCoachFilter(sb.from('postcomp_staff_entries').select('*').eq('competition_id', activeCompId)),
     applyCoachFilter(sb.from('voyage_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
+    applyCoachFilter(sb.from('precomp_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
   ]);
-  allJournals      = j.data   || [];
-  allResults       = r.data   || [];
-  allNationObs     = n.data   || [];
-  allEvents        = e.data   || [];
-  allStaffEntries  = se.data  || [];
-  allPrecompStaff  = ps.data  || [];
-  allPostcompStaff = pcs.data || [];
-  allVoyageEntries = voy.data || [];
+  allJournals       = j.data   || [];
+  allResults        = r.data   || [];
+  allNationObs      = n.data   || [];
+  allEvents         = e.data   || [];
+  allStaffEntries   = se.data  || [];
+  allPrecompStaff   = ps.data  || [];
+  allPostcompStaff  = pcs.data || [];
+  allVoyageEntries  = voy.data || [];
+  allPrecompEntries = pc.data  || [];
   buildFilters();
 }
 
@@ -571,7 +576,12 @@ function renderSynthese() {
   const { journals, results, nationObs } = getFiltered();
 
   // KPIs
-  const uniqueCoaches = new Set(journals.map(j => j.coach_id)).size;
+  const activeCoachIds = new Set([
+    ...journals.map(j => j.coach_id),
+    ...allVoyageEntries.map(v => v.coach_id),
+    ...allPrecompEntries.map(p => p.coach_id),
+  ]);
+  const uniqueCoaches = activeCoachIds.size;
   const uniqueAthletes = new Set(results.filter(r => r.a_nage).map(r => r.events?.athlete_id)).size;
   const todayEvents = filterDate !== 'all' ? allEvents.filter(e => e.date_epreuve === filterDate).length : allEvents.length;
   const days = new Set(allJournals.map(j => j.date_entree + j.coach_id)).size;
@@ -853,6 +863,43 @@ function renderEntraineurs() {
     </div>`;
   }
 
+  // ── QUESTIONNAIRES PRÉ-COMPÉTITION ───────────────────────
+  const precompContainer = document.getElementById('coaches-precomp-list');
+  if (precompContainer) {
+    if (!allPrecompEntries.length) {
+      precompContainer.innerHTML = '<div class="card"><div class="empty">Aucun questionnaire pré-compétition saisi</div></div>';
+    } else {
+      const byCoachPc = {};
+      allPrecompEntries.forEach(p => {
+        const k = p.coach_id;
+        if (!byCoachPc[k]) byCoachPc[k] = { coach: p.coaches, entries: [] };
+        byCoachPc[k].entries.push(p);
+      });
+      const scoreColor = s => s >= 3.5 ? 'var(--success)' : s >= 2.5 ? 'var(--accent2)' : 'var(--error)';
+      precompContainer.innerHTML = Object.values(byCoachPc).map(({ coach, entries }) => `
+        <div class="card" style="margin-bottom:1rem">
+          <div class="card-head">
+            <div class="card-title">${coach.prenom} ${coach.nom}</div>
+            <div class="card-sub">${entries.length} questionnaire(s)</div>
+          </div>
+          ${entries.map(p => `
+            <div style="padding:10px 14px;border-bottom:1px solid var(--border)">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <strong style="font-size:12px">${fmtDate(p.date_entree)}</strong>
+                <div style="display:flex;gap:4px">
+                  ${p.forme_generale != null ? `<span class="badge badge-gray">Forme ${p.forme_generale}/5</span>` : ''}
+                  ${p.mental_motivation != null ? `<span class="badge badge-orange">Motiv. ${p.mental_motivation}/5</span>` : ''}
+                  ${p.mental_confiance != null ? `<span class="badge badge-blue">Conf. ${p.mental_confiance}/5</span>` : ''}
+                  ${p.mental_anxiete != null ? `<span class="badge ${p.mental_anxiete >= 4 ? 'badge-red' : 'badge-green'}">Anxiété ${p.mental_anxiete}/5</span>` : ''}
+                </div>
+              </div>
+              ${p.objectifs_rappel ? `<div style="font-size:12px;color:var(--muted);margin-bottom:4px"><strong style="color:var(--navy)">Objectifs :</strong> ${p.objectifs_rappel}</div>` : ''}
+              ${p.points_attention ? `<div style="font-size:12px;color:var(--muted)"><strong style="color:var(--navy)">Points d'attention :</strong> ${p.points_attention}</div>` : ''}
+            </div>`).join('')}
+        </div>`).join('');
+    }
+  }
+
   // ── DÉTAIL PAR ENTRAÎNEUR (inchangé) ─────────────────────
   const byCoach = {};
   journals.forEach(j => {
@@ -927,8 +974,8 @@ function renderNations() {
       ${entries.map(e => `
         <div style="background:var(--surface2);border-radius:7px;padding:8px 10px;margin-bottom:6px;font-size:12px">
           <div style="color:var(--hint);font-size:11px;margin-bottom:4px">${e.coaches?.prenom} ${e.coaches?.nom} · ${fmtDate(e.date_obs)}</div>
-          ${e.observation ? `<div style="color:var(--text)">${e.observation}</div>` : ''}
-          ${e.a_retenir ? `<div style="color:var(--accent);margin-top:4px">→ ${e.a_retenir}</div>` : ''}
+          ${e.observation != null && e.observation !== '' ? `<div style="color:var(--text)">${e.observation}</div>` : '<div style="color:var(--hint);font-style:italic;font-size:11px">Aucune observation saisie</div>'}
+          ${e.a_retenir != null && e.a_retenir !== '' ? `<div style="color:var(--accent);margin-top:4px">→ ${e.a_retenir}</div>` : ''}
         </div>`).join('')}
     </div>`).join('');
 }
