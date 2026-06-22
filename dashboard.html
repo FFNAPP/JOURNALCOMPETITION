@@ -219,7 +219,7 @@
       <div class="card">
         <div class="card-head">
           <div class="card-title">État des entraîneurs</div>
-          <div class="card-sub" id="etat-date">Aujourd'hui</div>
+          <div class="card-sub">Vue d'ensemble</div>
         </div>
         <div id="coaches-etat-list"><div class="loading">Chargement…</div></div>
       </div>
@@ -251,20 +251,26 @@
 
     <!-- KPIs statistiques -->
     <div class="kpi-row" id="results-kpi-row" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi-card blue">
+      <div class="kpi-card blue" id="kpi-df-card">
         <div class="kpi-label">Demi-finales</div>
         <div class="kpi-value" id="stat-df-pct">—</div>
         <div class="kpi-sub" id="stat-df-detail">— nageurs qualifiés</div>
       </div>
-      <div class="kpi-card accent">
+      <div class="kpi-card accent" id="kpi-fin-card">
         <div class="kpi-label">Finales</div>
         <div class="kpi-value" id="stat-fin-pct">—</div>
         <div class="kpi-sub" id="stat-fin-detail">— nageurs en finale</div>
       </div>
-      <div class="kpi-card green">
+      <div class="kpi-card green" id="kpi-pod-card">
         <div class="kpi-label">Podiums</div>
         <div class="kpi-value" id="stat-pod-pct">—</div>
         <div class="kpi-sub" id="stat-pod-detail">— podiums</div>
+      </div>
+      <!-- KPI places gagnées (COMEN/CEJ_EL) -->
+      <div class="kpi-card green" id="kpi-places-card" style="display:none">
+        <div class="kpi-label">Places gagnées</div>
+        <div class="kpi-value" id="stat-places-total">—</div>
+        <div class="kpi-sub" id="stat-places-detail">— nageurs / épreuves</div>
       </div>
       <div class="kpi-card" style="border-left:3px solid var(--accent2)">
         <div class="kpi-label">Temps d'engagement battus</div>
@@ -272,6 +278,9 @@
         <div class="kpi-sub" id="stat-eng-detail">sur — épreuves chronométrées</div>
       </div>
     </div>
+
+    <!-- Meilleures épreuves -->
+    <div id="results-top-epreuves" style="margin-bottom:1rem"></div>
 
     <!-- Vue par épreuve -->
     <div class="card" style="margin-bottom:1rem">
@@ -354,10 +363,11 @@
 </div>
 
 <script>
-let activeCompId = null;
+let activeCompId = null, activeComp = null;
 let _dashRole = 'dtn', _dashCoachId = null;
 let allJournals = [], allResults = [], allNationObs = [], allEvents = [];
 let allStaffEntries = [], allPrecompStaff = [], allPostcompStaff = [], allVoyageEntries = [], allPrecompEntries = [];
+let allRelayEvents = [], allRelayResults = [];
 let filterDate = 'all', filterCoach = 'all';
 let currentTab = 'synthese', currentStaffSubTab = 'comp';
 
@@ -414,7 +424,8 @@ async function onCompChange() {
 }
 
 async function loadAllData() {
-  const [j, r, n, e, se, ps, pcs, voy, pc] = await Promise.all([
+  const [comp, j, r, n, e, se, ps, pcs, voy, pc, re, rr] = await Promise.all([
+    sb.from('competitions').select('*').eq('id', activeCompId).single(),
     applyCoachFilter(sb.from('journal_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
     sb.from('results').select('*, events(*, athletes(*)), coaches(*)').eq('competition_id', activeCompId),
     applyCoachFilter(sb.from('nation_observations').select('*, nations(*), coaches(*)').eq('competition_id', activeCompId)),
@@ -424,7 +435,10 @@ async function loadAllData() {
     applyCoachFilter(sb.from('postcomp_staff_entries').select('*').eq('competition_id', activeCompId)),
     applyCoachFilter(sb.from('voyage_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
     applyCoachFilter(sb.from('precomp_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
+    sb.from('relay_events').select('*').eq('competition_id', activeCompId),
+    sb.from('relay_results').select('*, relay_events(*)').eq('relay_events.competition_id', activeCompId),
   ]);
+  activeComp        = comp.data || null;
   allJournals       = j.data   || [];
   allResults        = r.data   || [];
   allNationObs      = n.data   || [];
@@ -434,6 +448,8 @@ async function loadAllData() {
   allPostcompStaff  = pcs.data || [];
   allVoyageEntries  = voy.data || [];
   allPrecompEntries = pc.data  || [];
+  allRelayEvents    = re.data  || [];
+  allRelayResults   = (rr.data || []).filter(r => r.relay_events);
   buildFilters();
 }
 
@@ -595,28 +611,32 @@ function renderSynthese() {
   document.getElementById('kpi-events').textContent = todayEvents || '—';
   document.getElementById('kpi-fill').textContent = total ? Math.round(days / total * 100) + '%' : '—';
 
-  // ── ÉTAT ENTRAÎNEURS (synthèse enrichie) ─────────────────
-  // Construire index coach → toutes ses entrées (triées) pour moyenne + tendance
+  // ── ÉTAT ENTRAÎNEURS (une ligne par coach) ────────────────
   const scoreOf = j => {
     const vals = [j.forme_physique, j.forme_psychologique].filter(v => v);
     return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
   };
+  // Grouper toutes les entrées par coach (non filtré par date)
   const allByCoachSynth = {};
   allJournals.forEach(j => {
-    if (!allByCoachSynth[j.coach_id]) allByCoachSynth[j.coach_id] = [];
-    allByCoachSynth[j.coach_id].push(j);
+    if (!allByCoachSynth[j.coach_id]) allByCoachSynth[j.coach_id] = { coach: j.coaches, entries: [] };
+    allByCoachSynth[j.coach_id].entries.push(j);
   });
-  Object.values(allByCoachSynth).forEach(arr => arr.sort((a, b) => a.date_entree.localeCompare(b.date_entree)));
+  Object.values(allByCoachSynth).forEach(c => c.entries.sort((a, b) => a.date_entree.localeCompare(b.date_entree)));
+
+  // Nombre de jours de compétition (jours distincts dans allJournals)
+  const totalJours = new Set(allJournals.map(j => j.date_entree)).size;
 
   const coachesList = document.getElementById('coaches-etat-list');
-  if (!journals.length) { coachesList.innerHTML = '<div class="empty">Aucune entrée</div>'; }
+  const coachList = Object.values(allByCoachSynth);
+  if (!coachList.length) { coachesList.innerHTML = '<div class="empty">Aucune entrée</div>'; }
   else {
     const scoreColorSynth = s => s >= 3.5 ? 'var(--success)' : s >= 2.5 ? 'var(--accent2)' : 'var(--error)';
-    coachesList.innerHTML = journals.map(j => {
-      const coachEntries = allByCoachSynth[j.coach_id] || [];
-      const withScore = coachEntries.filter(e => scoreOf(e) !== null);
+    coachesList.innerHTML = coachList.map(({ coach, entries }) => {
+      const withScore = entries.filter(e => scoreOf(e) !== null);
       const avgGlobal = withScore.length ? (withScore.reduce((s, e) => s + scoreOf(e), 0) / withScore.length) : null;
-      // Tendance : comparer dernier vs avant-dernier
+      const last = entries[entries.length - 1];
+      // Tendance : dernière entrée vs avant-dernière
       let tendance = '', tendanceColor = 'var(--hint)';
       if (withScore.length >= 2) {
         const diff = scoreOf(withScore[withScore.length - 1]) - scoreOf(withScore[withScore.length - 2]);
@@ -624,27 +644,17 @@ function renderSynthese() {
         else if (diff < -0.3) { tendance = '↓'; tendanceColor = 'var(--error)'; }
         else                  { tendance = '→'; tendanceColor = 'var(--muted)'; }
       }
-      return `
-      <div class="coach-entry">
-        <div class="coach-entry-head">
-          <div>
-            <div class="coach-name">${j.coaches.prenom} ${j.coaches.nom}</div>
-            <div class="coach-meta">${fmtDate(j.date_entree)} ${j.etat_groupe ? '· ' + j.etat_groupe : ''}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            ${j.forme_physique ? `<span class="badge badge-gray">Phys. ${j.forme_physique}/5</span>` : ''}
-            ${j.forme_psychologique ? `<span class="badge badge-blue">Psy. ${j.forme_psychologique}/5</span>` : ''}
-            ${avgGlobal !== null ? `<span style="font-size:13px;font-weight:600;color:${scoreColorSynth(avgGlobal)};font-family:'DM Mono',monospace;min-width:28px;text-align:right">${avgGlobal.toFixed(1)}</span>` : ''}
-            ${tendance ? `<span style="font-size:18px;color:${tendanceColor};line-height:1">${tendance}</span>` : ''}
+      const col = avgGlobal !== null ? scoreColorSynth(avgGlobal) : 'var(--hint)';
+      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:500;color:var(--navy)">${coach.prenom} ${coach.nom}</div>
+          <div style="font-size:11px;color:var(--hint);margin-top:1px">
+            Dernière réponse : ${last ? fmtDate(last.date_entree) : '—'}
+            · <strong style="color:var(--muted)">${entries.length}</strong>/${totalJours} jour(s)
           </div>
         </div>
-        ${j.eval_communication ? `
-        <div class="coach-scores">
-          <div class="coach-score-item">Comm. ${j.eval_communication}/5 ${renderProgressBar(j.eval_communication, 'var(--blue)')}</div>
-          <div class="coach-score-item">Stress ${j.eval_stress}/5 ${renderProgressBar(j.eval_stress, 'var(--purple)')}</div>
-          <div class="coach-score-item">Décisions ${j.eval_decisions}/5 ${renderProgressBar(j.eval_decisions, 'var(--accent)')}</div>
-          <div class="coach-score-item">Présence ${j.eval_presence}/5 ${renderProgressBar(j.eval_presence, 'var(--teal)')}</div>
-        </div>` : ''}
+        <div style="font-size:22px;font-weight:700;color:${col};font-family:'DM Mono',monospace;min-width:36px;text-align:right">${avgGlobal !== null ? avgGlobal.toFixed(1) : '—'}</div>
+        <div style="font-size:22px;color:${tendanceColor};line-height:1;min-width:20px;text-align:center">${tendance || '—'}</div>
       </div>`;
     }).join('');
   }
@@ -692,15 +702,110 @@ function renderResultats() {
   // ── KPIs stats ──────────────────────────────────────────
   const stats = computeResultStats(results, allEvents);
   const fmtPct = (pct) => pct !== null ? pct + '%' : '—';
-  document.getElementById('stat-df-pct').textContent    = fmtPct(stats.pctDF);
-  document.getElementById('stat-df-detail').textContent = `${stats.nbDF} nageur(s) qualifié(s)`;
-  document.getElementById('stat-fin-pct').textContent   = fmtPct(stats.pctFinale);
-  document.getElementById('stat-fin-detail').textContent = `${stats.nbFinale} nageur(s) en finale`;
-  document.getElementById('stat-pod-pct').textContent   = fmtPct(stats.pctPodium);
-  document.getElementById('stat-pod-detail').textContent = `${stats.nbPodium} podium(s)`;
+  const isCOMEN = ['COMEN','CEJ_EL'].includes(activeComp?.type_competition);
+
+  // Masquer/afficher les KPI selon type de compétition
+  ['kpi-df-card','kpi-fin-card','kpi-pod-card'].forEach(id => {
+    document.getElementById(id).style.display = isCOMEN ? 'none' : '';
+  });
+  document.getElementById('kpi-places-card').style.display = isCOMEN ? '' : 'none';
+  document.getElementById('results-kpi-row').style.gridTemplateColumns = isCOMEN ? 'repeat(2,1fr)' : 'repeat(4,1fr)';
+
+  if (!isCOMEN) {
+    document.getElementById('stat-df-pct').textContent    = fmtPct(stats.pctDF);
+    document.getElementById('stat-df-detail').textContent = `${stats.nbDF} nageur(s) qualifié(s)`;
+    document.getElementById('stat-fin-pct').textContent   = fmtPct(stats.pctFinale);
+    document.getElementById('stat-fin-detail').textContent = `${stats.nbFinale} nageur(s) en finale`;
+    document.getElementById('stat-pod-pct').textContent   = fmtPct(stats.pctPodium);
+    document.getElementById('stat-pod-detail').textContent = `${stats.nbPodium} podium(s)`;
+  } else {
+    const avecRanking = results.filter(r => r.a_nage && r.events?.ranking_initial != null && r.rang != null);
+    const placesGagnees = avecRanking.filter(r => r.events.ranking_initial - r.rang > 0);
+    const totalPlaces = placesGagnees.reduce((s, r) => s + (r.events.ranking_initial - r.rang), 0);
+    document.getElementById('stat-places-total').textContent = totalPlaces > 0 ? '+' + totalPlaces : '0';
+    document.getElementById('stat-places-detail').textContent =
+      `${placesGagnees.length} nageur(s) sur ${avecRanking.length} épreuve(s)`;
+  }
   document.getElementById('stat-eng-pct').textContent   = fmtPct(stats.pctEngagement);
   document.getElementById('stat-eng-detail').textContent =
     `${stats.engagementBattus} sur ${stats.totalAvecEngagement} épreuves chronométrées`;
+
+  // ── Meilleures épreuves ──────────────────────────────────
+  const topEl = document.getElementById('results-top-epreuves');
+  // Agréger par nom d'épreuve (individuel + relais)
+  const eprStats = {};
+  const ensureEpr = nom => { if (!eprStats[nom]) eprStats[nom] = { rang: [], places: [], isRelay: false }; };
+
+  results.filter(r => r.a_nage && r.rang != null).forEach(r => {
+    const nom = r.events?.epreuve; if (!nom) return;
+    ensureEpr(nom);
+    eprStats[nom].rang.push(r.rang);
+    if (r.events?.ranking_initial != null) {
+      const delta = r.events.ranking_initial - r.rang;
+      if (delta > 0) eprStats[nom].places.push(delta);
+    }
+  });
+  allRelayResults.forEach(rr => {
+    if (!rr.rang) return;
+    const nom = rr.relay_events?.epreuve; if (!nom) return;
+    ensureEpr(nom);
+    eprStats[nom].rang.push(rr.rang);
+    eprStats[nom].isRelay = true;
+  });
+
+  const eprList = Object.entries(eprStats).map(([nom, d]) => ({
+    nom,
+    avgRang: d.rang.length ? d.rang.reduce((a,b)=>a+b,0)/d.rang.length : null,
+    totalPlaces: d.places.reduce((a,b)=>a+b,0),
+    nbPlaces: d.places.length,
+    nbRang: d.rang.length,
+    isRelay: d.isRelay,
+  }));
+
+  const topRanking = [...eprList].filter(e => e.avgRang !== null).sort((a,b) => a.avgRang - b.avgRang).slice(0, 8);
+  const topPlaces  = [...eprList].filter(e => e.totalPlaces > 0).sort((a,b) => b.totalPlaces - a.totalPlaces).slice(0, 8);
+
+  if (!topRanking.length && !topPlaces.length) {
+    topEl.innerHTML = '';
+  } else {
+    const maxRang = topRanking.length ? topRanking[topRanking.length-1].avgRang : 1;
+    const maxPlaces = topPlaces.length ? topPlaces[0].totalPlaces : 1;
+    const relayBadge = isRelay => isRelay ? `<span style="font-size:9px;background:#EBF0F8;color:var(--blue);padding:1px 5px;border-radius:10px;margin-left:4px;font-weight:600">RELAIS</span>` : '';
+
+    const barRanking = topRanking.map(e => {
+      const pct = Math.round((1 - (e.avgRang - 1) / Math.max(maxRang - 1, 1)) * 100);
+      const col = e.avgRang <= 3 ? 'var(--success)' : e.avgRang <= 8 ? 'var(--accent2)' : 'var(--blue-light)';
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <div style="font-size:12px;color:var(--text);width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0">${e.nom}${relayBadge(e.isRelay)}</div>
+        <div style="flex:1;background:var(--surface2);border-radius:4px;height:10px;overflow:hidden">
+          <div style="width:${Math.max(pct,4)}%;height:100%;background:${col};border-radius:4px"></div>
+        </div>
+        <div style="font-size:11px;font-weight:600;color:${col};font-family:'DM Mono',monospace;min-width:32px;text-align:right">#${e.avgRang.toFixed(1)}</div>
+      </div>`;
+    }).join('');
+
+    const barPlaces = topPlaces.map(e => {
+      const pct = Math.round(e.totalPlaces / maxPlaces * 100);
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <div style="font-size:12px;color:var(--text);width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0">${e.nom}${relayBadge(e.isRelay)}</div>
+        <div style="flex:1;background:var(--surface2);border-radius:4px;height:10px;overflow:hidden">
+          <div style="width:${Math.max(pct,4)}%;height:100%;background:var(--success);border-radius:4px"></div>
+        </div>
+        <div style="font-size:11px;font-weight:600;color:var(--success);font-family:'DM Mono',monospace;min-width:48px;text-align:right">+${e.totalPlaces} (${e.nbPlaces})</div>
+      </div>`;
+    }).join('');
+
+    topEl.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+      ${topRanking.length ? `<div class="card">
+        <div class="card-head"><div class="card-title">Meilleur ranking moyen</div><div class="card-sub">par épreuve</div></div>
+        <div style="padding:12px 14px">${barRanking}</div>
+      </div>` : ''}
+      ${topPlaces.length ? `<div class="card">
+        <div class="card-head"><div class="card-title">Plus de places gagnées</div><div class="card-sub">vs ranking initial · nb nageurs</div></div>
+        <div style="padding:12px 14px">${barPlaces}</div>
+      </div>` : ''}
+    </div>`;
+  }
 
   // ── Vue par épreuve ──────────────────────────────────────
   const byEpreuve = {};
