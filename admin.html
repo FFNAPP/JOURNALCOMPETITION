@@ -437,7 +437,7 @@
                   <option>50m Papillon</option><option>100m Papillon</option><option>200m Papillon</option>
                   <option>200m 4 Nages</option><option>400m 4 Nages</option>
                   <option>4x50m Nage libre</option><option>4x100m Nage libre</option><option>4x200m Nage libre</option>
-                  <option>4x100m 4 Nages</option><option>4x50m 4 Nages</option><option>4x50m 4 Nages Mixte</option><option>4x100m Nage libre Mixte</option>
+                  <option>4x100m 4 Nages</option><option>4x50m 4 Nages</option><option>4x50m 4 Nages Mixte</option><option>4x100m Nage libre Mixte</option><option>4x100m 4 Nages Mixte</option>
                   <option disabled style="color:var(--hint);font-size:11px">── Eau Libre ──</option>
                   <option value="5km">5km</option>
                   <option value="7.5km">7,5km</option>
@@ -1308,7 +1308,7 @@ async function confirmCSVImport() {
   loadEvents();
 }
 
-const RELAY_EPREUVES = ['4x50m Nage libre','4x100m Nage libre','4x200m Nage libre','4x100m 4 Nages','4x50m 4 Nages','4x50m 4 Nages Mixte','4x100m Nage libre Mixte','Relais 4x1500m'];
+const RELAY_EPREUVES = ['4x50m Nage libre','4x100m Nage libre','4x200m Nage libre','4x100m 4 Nages','4x50m 4 Nages','4x50m 4 Nages Mixte','4x100m Nage libre Mixte','4x100m 4 Nages Mixte','Relais 4x1500m'];
 
 function onEpreuveChange() {
   const epreuve = document.getElementById('ev-epreuve').value;
@@ -1494,7 +1494,7 @@ _adminReady.then(() => { loadCompetitions(); loadCoaches(); loadAthletes(); });
   <div style="background:var(--surface);border-radius:12px;padding:24px;min-width:540px;max-width:95vw;max-height:90vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)">
     <div style="font-weight:600;color:var(--navy);margin-bottom:16px;font-size:15px">Ajouter un relais</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div style="grid-column:1/-1"><label>Type de relais *</label><select id="relay-type"><option value="4x50m Nage libre">4x50m Nage libre</option><option value="4x100m Nage libre">4x100m Nage libre</option><option value="4x200m Nage libre">4x200m Nage libre</option><option value="4x100m 4 Nages">4x100m 4 Nages</option><option value="4x50m 4 Nages">4x50m 4 Nages</option><option value="4x50m 4 Nages Mixte">4x50m 4 Nages Mixte</option><option value="4x100m Nage libre Mixte">4x100m Nage libre Mixte</option></select></div>
+      <div style="grid-column:1/-1"><label>Type de relais *</label><select id="relay-type"><option value="4x50m Nage libre">4x50m Nage libre</option><option value="4x100m Nage libre">4x100m Nage libre</option><option value="4x200m Nage libre">4x200m Nage libre</option><option value="4x100m 4 Nages">4x100m 4 Nages</option><option value="4x50m 4 Nages">4x50m 4 Nages</option><option value="4x50m 4 Nages Mixte">4x50m 4 Nages Mixte</option><option value="4x100m Nage libre Mixte">4x100m Nage libre Mixte</option><option value="4x100m 4 Nages Mixte">4x100m 4 Nages Mixte</option></select></div>
       <div><label>Tour</label><select id="relay-tour"><option value="finale" selected>Finale</option><option value="serie">Série</option><option value="demi-finale">Demi-finale</option></select></div>
       <div><label>Date *</label><input type="date" id="relay-date"></div>
       <div><label>Heure</label><input type="time" id="relay-heure"></div>
