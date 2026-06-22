@@ -212,7 +212,7 @@
       <div class="kpi-card green"><div class="kpi-label">Taux de saisie</div><div class="kpi-value" id="kpi-fill">—</div><div class="kpi-sub">journaux / jours</div></div>
     </div>
 
-    <div id="synthese-forme-bandeau" style="margin-bottom:1.25rem"></div>
+
 
     <div class="grid-2">
       <!-- Résumé entraîneurs du jour -->
@@ -595,94 +595,47 @@ function renderSynthese() {
   document.getElementById('kpi-events').textContent = todayEvents || '—';
   document.getElementById('kpi-fill').textContent = total ? Math.round(days / total * 100) + '%' : '—';
 
-  // ── FORME ENTRAÎNEURS (bandeau synthèse) ─────────────────
-  const synthFormeBandeau = document.getElementById('synthese-forme-bandeau');
-  if (synthFormeBandeau) {
-    const formeByCoachS = {};
-    const ensureCoachS = (id, obj) => { if (!formeByCoachS[id]) formeByCoachS[id] = { coach: obj, points: [] }; };
-    allJournals.forEach(j => {
-      if (!j.forme_physique && !j.forme_psychologique) return;
-      ensureCoachS(j.coach_id, j.coaches);
-      formeByCoachS[j.coach_id].points.push({ date: j.date_entree, phys: j.forme_physique, psy: j.forme_psychologique, source: 'comp' });
-    });
-    allVoyageEntries.forEach(v => {
-      if (!v.forme_physique && !v.forme_psychologique) return;
-      ensureCoachS(v.coach_id, v.coaches);
-      formeByCoachS[v.coach_id].points.push({ date: v.date_entree, phys: v.forme_physique, psy: v.forme_psychologique, source: 'voyage' });
-    });
-    allPrecompEntries.forEach(p => {
-      if (!p.coach_forme_physique && !p.coach_forme_psychologique) return;
-      ensureCoachS(p.coach_id, p.coaches);
-      formeByCoachS[p.coach_id].points.push({ date: p.date_entree, phys: p.coach_forme_physique, psy: p.coach_forme_psychologique, source: 'precomp' });
-    });
-    Object.values(formeByCoachS).forEach(c => c.points.sort((a, b) => a.date.localeCompare(b.date)));
-    const coachesAvecDonneesS = Object.values(formeByCoachS).filter(c => c.points.length > 0);
+  // ── ÉTAT ENTRAÎNEURS (synthèse enrichie) ─────────────────
+  // Construire index coach → toutes ses entrées (triées) pour moyenne + tendance
+  const scoreOf = j => {
+    const vals = [j.forme_physique, j.forme_psychologique].filter(v => v);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  };
+  const allByCoachSynth = {};
+  allJournals.forEach(j => {
+    if (!allByCoachSynth[j.coach_id]) allByCoachSynth[j.coach_id] = [];
+    allByCoachSynth[j.coach_id].push(j);
+  });
+  Object.values(allByCoachSynth).forEach(arr => arr.sort((a, b) => a.date_entree.localeCompare(b.date_entree)));
 
-    if (!coachesAvecDonneesS.length) {
-      synthFormeBandeau.innerHTML = '';
-    } else {
-      const scoreColorS = s => s >= 3.5 ? 'var(--success)' : s >= 2.5 ? 'var(--accent2)' : 'var(--error)';
-      const jaugeS = (val, color) => {
-        if (!val) return '<span style="color:var(--hint);font-size:11px">—</span>';
-        const pct = (val / 5) * 100;
-        return `<div style="display:flex;align-items:center;gap:6px">
-          <div style="width:64px;height:7px;background:var(--border);border-radius:4px;overflow:hidden;flex-shrink:0">
-            <div style="width:${pct}%;height:100%;background:${color};border-radius:4px"></div>
-          </div>
-          <span style="font-size:11px;color:var(--muted)">${val}/5</span>
-        </div>`;
-      };
-      const srcLabel = s => s === 'voyage' ? 'Voyage' : s === 'precomp' ? 'Pré-comp' : 'Comp.';
-      const rows = coachesAvecDonneesS.map(({ coach, points }) => {
-        const last = points[points.length - 1];
-        const avg = [last.phys, last.psy].filter(v => v);
-        const score = avg.length ? (avg.reduce((a, b) => a + b, 0) / avg.length) : null;
-        const col = score ? scoreColorS(score) : 'var(--hint)';
-        return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 60px;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)">
-          <div>
-            <div style="font-size:13px;font-weight:500;color:var(--navy)">${coach.prenom} ${coach.nom}</div>
-            <div style="font-size:10px;color:var(--hint);margin-top:1px">${fmtDate(last.date)} · ${srcLabel(last.source)}</div>
-          </div>
-          <div>
-            <div style="font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Physique</div>
-            ${jaugeS(last.phys, scoreColorS(last.phys || 0))}
-          </div>
-          <div>
-            <div style="font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Psychologique</div>
-            ${jaugeS(last.psy, scoreColorS(last.psy || 0))}
-          </div>
-          <div style="text-align:center">
-            <div style="font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Moy.</div>
-            <div style="font-size:15px;font-weight:600;color:${col};font-family:'DM Mono',monospace">${score ? score.toFixed(1) : '—'}</div>
-          </div>
-        </div>`;
-      }).join('');
-      synthFormeBandeau.innerHTML = `<div class="card">
-        <div class="card-head">
-          <div class="card-title">Forme des entraîneurs</div>
-          <div class="card-sub">
-            <button onclick="showTab('entraineurs')" style="background:none;border:none;color:var(--blue-light);cursor:pointer;font-size:11px;padding:0">Voir le détail →</button>
-          </div>
-        </div>
-        <div style="padding:0">${rows}</div>
-      </div>`;
-    }
-  }
-
-  // État entraîneurs
   const coachesList = document.getElementById('coaches-etat-list');
   if (!journals.length) { coachesList.innerHTML = '<div class="empty">Aucune entrée</div>'; }
   else {
-    coachesList.innerHTML = journals.map(j => `
+    const scoreColorSynth = s => s >= 3.5 ? 'var(--success)' : s >= 2.5 ? 'var(--accent2)' : 'var(--error)';
+    coachesList.innerHTML = journals.map(j => {
+      const coachEntries = allByCoachSynth[j.coach_id] || [];
+      const withScore = coachEntries.filter(e => scoreOf(e) !== null);
+      const avgGlobal = withScore.length ? (withScore.reduce((s, e) => s + scoreOf(e), 0) / withScore.length) : null;
+      // Tendance : comparer dernier vs avant-dernier
+      let tendance = '', tendanceColor = 'var(--hint)';
+      if (withScore.length >= 2) {
+        const diff = scoreOf(withScore[withScore.length - 1]) - scoreOf(withScore[withScore.length - 2]);
+        if (diff > 0.3)       { tendance = '↑'; tendanceColor = 'var(--success)'; }
+        else if (diff < -0.3) { tendance = '↓'; tendanceColor = 'var(--error)'; }
+        else                  { tendance = '→'; tendanceColor = 'var(--muted)'; }
+      }
+      return `
       <div class="coach-entry">
         <div class="coach-entry-head">
           <div>
             <div class="coach-name">${j.coaches.prenom} ${j.coaches.nom}</div>
             <div class="coach-meta">${fmtDate(j.date_entree)} ${j.etat_groupe ? '· ' + j.etat_groupe : ''}</div>
           </div>
-          <div style="display:flex;gap:6px">
+          <div style="display:flex;align-items:center;gap:8px">
             ${j.forme_physique ? `<span class="badge badge-gray">Phys. ${j.forme_physique}/5</span>` : ''}
             ${j.forme_psychologique ? `<span class="badge badge-blue">Psy. ${j.forme_psychologique}/5</span>` : ''}
+            ${avgGlobal !== null ? `<span style="font-size:13px;font-weight:600;color:${scoreColorSynth(avgGlobal)};font-family:'DM Mono',monospace;min-width:28px;text-align:right">${avgGlobal.toFixed(1)}</span>` : ''}
+            ${tendance ? `<span style="font-size:18px;color:${tendanceColor};line-height:1">${tendance}</span>` : ''}
           </div>
         </div>
         ${j.eval_communication ? `
@@ -692,7 +645,8 @@ function renderSynthese() {
           <div class="coach-score-item">Décisions ${j.eval_decisions}/5 ${renderProgressBar(j.eval_decisions, 'var(--accent)')}</div>
           <div class="coach-score-item">Présence ${j.eval_presence}/5 ${renderProgressBar(j.eval_presence, 'var(--teal)')}</div>
         </div>` : ''}
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   // Nations
@@ -771,8 +725,14 @@ function renderResultats() {
       });
 
       const rowsHtml = rows.map(r => {
-        const engBattu = r.a_nage && r.events?.temps_engagement && r.temps &&
-                         compareTemps(r.temps, r.events.temps_engagement) < 0;
+        const ref = r.events?.temps_engagement;
+        const hasTemps = r.a_nage && r.temps && r.temps !== '0';
+        let tempsCmp = null;
+        if (hasTemps && ref) tempsCmp = compareTemps(r.temps, ref);
+        const tempsStyle = tempsCmp === null ? '' :
+          tempsCmp < 0  ? 'background:#d4edda;color:#155724;border-radius:4px;padding:2px 6px;border:1px solid #a3d4aa' :
+          tempsCmp === 0 ? 'background:#fff3cd;color:#856404;border-radius:4px;padding:2px 6px;border:1px solid #ffc107' :
+                           'background:#fde8e8;color:#922b21;border-radius:4px;padding:2px 6px;border:1px solid #f5b7b1';
         const podium = r.a_nage && r.rang && r.rang <= 3;
         return `<tr>
           <td><strong style="font-size:12px">${r.events?.athletes?.prenom} ${r.events?.athletes?.nom}</strong></td>
@@ -780,10 +740,9 @@ function renderResultats() {
           <td style="font-family:'DM Mono',monospace;font-size:11px">${fmtDate(r.events?.date_epreuve)}</td>
           <td>${r.a_nage ? '<span class="badge badge-green">✓ Nagé</span>' : '<span class="badge badge-red">✕ DNS</span>'}</td>
           <td style="font-family:'DM Mono',monospace;font-weight:500">
-            ${r.temps || '—'}
-            ${engBattu ? '<span style="color:var(--success);font-size:10px;margin-left:4px">↓ Réf.</span>' : ''}
+            <span style="${tempsStyle}">${r.temps || '—'}</span>
           </td>
-          <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.temps_engagement || '—'}</td>
+          <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${ref || '—'}</td>
           <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.ranking_initial != null ? '#'+r.events.ranking_initial : '—'}</td>
           <td>${r.rang ? `<span class="badge ${podium ? 'badge-green' : r.rang <= 8 ? 'badge-orange' : 'badge-gray'}">${podium ? '🏅 ' : ''}${r.rang}</span>` : '—'}</td>
           <td>${fmtDelta(r.events?.ranking_initial, r.rang)}</td>
@@ -813,15 +772,20 @@ function renderResultats() {
     tbody.innerHTML = '<tr><td colspan="12" class="empty">Aucun résultat</td></tr>';
   } else {
     tbody.innerHTML = results.map(r => {
-      const engBattu = r.a_nage && r.events?.temps_engagement && r.temps &&
-                       compareTemps(r.temps, r.events.temps_engagement) < 0;
+      const _ref2 = r.events?.temps_engagement;
+      const _hasT2 = r.a_nage && r.temps && r.temps !== '0';
+      const _cmp2 = (_hasT2 && _ref2) ? compareTemps(r.temps, _ref2) : null;
+      const _ts2 = _cmp2 === null ? '' :
+        _cmp2 < 0  ? 'background:#d4edda;color:#155724;border-radius:4px;padding:2px 6px;border:1px solid #a3d4aa' :
+        _cmp2 === 0 ? 'background:#fff3cd;color:#856404;border-radius:4px;padding:2px 6px;border:1px solid #ffc107' :
+                      'background:#fde8e8;color:#922b21;border-radius:4px;padding:2px 6px;border:1px solid #f5b7b1';
       return `<tr>
         <td><strong style="font-size:12px">${r.events?.athletes?.prenom} ${r.events?.athletes?.nom}</strong></td>
         <td style="font-size:11px">${r.events?.epreuve}</td>
         <td>${badgeTour(r.events?.tour)}</td>
         <td style="font-family:'DM Mono',monospace;font-size:11px">${fmtDate(r.events?.date_epreuve)}</td>
         <td>${r.a_nage ? '<span class="badge badge-green">✓</span>' : '<span class="badge badge-red">✕</span>'}</td>
-        <td style="font-family:'DM Mono',monospace;font-weight:500">${r.temps || '—'}${engBattu ? ' <span style="color:var(--success);font-size:10px">↓</span>' : ''}</td>
+        <td style="font-family:'DM Mono',monospace;font-weight:500"><span style="${_ts2}">${r.temps || '—'}</span></td>
         <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.temps_engagement || '—'}</td>
         <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.ranking_initial != null ? '#'+r.events.ranking_initial : '—'}</td>
         <td>${r.rang ? `<span class="badge ${r.rang<=3?'badge-green':r.rang<=8?'badge-orange':'badge-gray'}">${r.rang}</span>` : '—'}</td>
@@ -1114,120 +1078,195 @@ function renderRapportFinal() {
     const postcompData = allPostcompStaff.length ? allPostcompStaff[0] : null;
 
     // Calculate metrics
-    const totalResults = allResults.filter(r => r.a_nage).length;
-    const medalResults = allResults.filter(r => r.a_nage && r.rang && r.rang <= 3).length;
     const uniqueCoaches = new Set(allJournals.map(j => j.coach_id)).size;
     const uniqueAthletes = new Set(allResults.filter(r => r.a_nage).map(r => r.events?.athlete_id)).size;
-    const avgStaffLogistique = allStaffEntries.length ? (allStaffEntries.reduce((s,e) => s+[e.log_trajet,e.log_navette,e.log_hebergement,e.log_restauration,e.log_meteo].filter(x=>x).reduce((a,b)=>a+b,0),0) / (allStaffEntries.length * 5)).toFixed(1) : '—';
-    const avgStaffVie = allStaffEntries.length ? (allStaffEntries.reduce((s,e) => s+[e.vie_attitude,e.vie_cohesion,e.vie_consignes,e.vie_valeurs,e.vie_temps_libre,e.vie_recuperation,e.vie_suivi_medical].filter(x=>x).reduce((a,b)=>a+b,0),0) / (allStaffEntries.length * 7)).toFixed(1) : '—';
+    const avgStaffLogistique = allStaffEntries.length ? (allStaffEntries.reduce((s,e) => s+[e.log_trajet,e.log_navette,e.log_hebergement,e.log_restauration,e.log_meteo].filter(x=>x).reduce((a,b)=>a+b,0),0) / (allStaffEntries.length * 5)).toFixed(1) : null;
+    const avgStaffVie = allStaffEntries.length ? (allStaffEntries.reduce((s,e) => s+[e.vie_attitude,e.vie_cohesion,e.vie_consignes,e.vie_valeurs,e.vie_temps_libre,e.vie_recuperation,e.vie_suivi_medical].filter(x=>x).reduce((a,b)=>a+b,0),0) / (allStaffEntries.length * 7)).toFixed(1) : null;
     const medicalInterventions = allStaffEntries.filter(e => e.vie_medecin).length;
 
     // Calcul des statistiques avancées
     const stats = computeResultStats(allResults, allEvents);
     const fmtPct = (pct) => pct !== null ? pct + '%' : '—';
 
+    // Type de compétition : classement au temps (pas de tours) ?
+    const isSerieTour = ['COMEN','CEJ_EL'].includes(comp.type_competition);
+
+    // Places gagnées dans le ranking (pour COMEN/CEJ_EL)
+    const avecRanking = allResults.filter(r => r.a_nage && r.events?.ranking_initial != null && r.rang != null);
+    const placesGagnees = avecRanking.map(r => r.events.ranking_initial - r.rang).filter(d => d > 0);
+    const moyPlacesGagnees = placesGagnees.length ? (placesGagnees.reduce((a,b)=>a+b,0)/placesGagnees.length).toFixed(1) : null;
+    const nbPlacesGagnees = placesGagnees.reduce((a,b)=>a+b,0);
+
+    // Forme entraîneurs — moyenne globale pour le rapport
+    const formeByCoachR = {};
+    allJournals.forEach(j => {
+      if (!j.forme_physique && !j.forme_psychologique) return;
+      if (!formeByCoachR[j.coach_id]) formeByCoachR[j.coach_id] = { coach: j.coaches, scores: [] };
+      const avg = [j.forme_physique, j.forme_psychologique].filter(v=>v);
+      if (avg.length) formeByCoachR[j.coach_id].scores.push(avg.reduce((a,b)=>a+b,0)/avg.length);
+    });
+    allVoyageEntries.forEach(v => {
+      if (!v.forme_physique && !v.forme_psychologique) return;
+      if (!formeByCoachR[v.coach_id]) formeByCoachR[v.coach_id] = { coach: v.coaches, scores: [] };
+      const avg = [v.forme_physique, v.forme_psychologique].filter(x=>x);
+      if (avg.length) formeByCoachR[v.coach_id].scores.push(avg.reduce((a,b)=>a+b,0)/avg.length);
+    });
+    allPrecompEntries.forEach(p => {
+      if (!p.coach_forme_physique && !p.coach_forme_psychologique) return;
+      if (!formeByCoachR[p.coach_id]) formeByCoachR[p.coach_id] = { coach: p.coaches, scores: [] };
+      const avg = [p.coach_forme_physique, p.coach_forme_psychologique].filter(x=>x);
+      if (avg.length) formeByCoachR[p.coach_id].scores.push(avg.reduce((a,b)=>a+b,0)/avg.length);
+    });
+
+    // ── Helpers visuels ───────────────────────────────────────
+    // Jauge demi-cercle SVG (barometer style)
+    const svgGauge = (val, max, color, label) => {
+      if (val == null || val === '—') return `<div style="text-align:center"><div style="font-size:20px;color:var(--hint)">—</div><div style="font-size:10px;color:var(--hint)">${label}</div></div>`;
+      const pct = Math.min(Math.max(parseFloat(val) / max, 0), 1);
+      const r = 38, cx = 50, cy = 50, strokeW = 9;
+      const arcLen = Math.PI * r;
+      const dash = pct * arcLen;
+      const scoreColor = typeof color === 'string' && color.startsWith('var') ? color :
+        pct >= 0.7 ? '#1A7A4A' : pct >= 0.5 ? '#F0A500' : '#C0392B';
+      return `<div style="text-align:center">
+        <svg viewBox="0 0 100 58" width="88" height="52" style="overflow:visible">
+          <path d="M12,50 A38,38 0 0,1 88,50" fill="none" stroke="#DDE3EE" stroke-width="${strokeW}" stroke-linecap="round"/>
+          <path d="M12,50 A38,38 0 0,1 88,50" fill="none" stroke="${scoreColor}" stroke-width="${strokeW}" stroke-linecap="round"
+            stroke-dasharray="${dash} ${arcLen}" stroke-dashoffset="0"/>
+          <text x="50" y="48" text-anchor="middle" font-size="15" font-weight="700" fill="${scoreColor}" font-family="DM Mono,monospace">${typeof val === 'number' ? val.toFixed(1) : val}</text>
+          <text x="50" y="57" text-anchor="middle" font-size="8" fill="#9AA3B5">${label}</text>
+        </svg>
+      </div>`;
+    };
+
+    // Barre de progression horizontale fine avec score
+    const progressBar = (val, max, color, label) => {
+      if (!val) return '';
+      const pct = Math.round(parseFloat(val) / max * 100);
+      const col = typeof color === 'string' && color.startsWith('#') ? color :
+        pct >= 70 ? '#1A7A4A' : pct >= 50 ? '#F0A500' : '#C0392B';
+      return `<div style="margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px;font-size:11px;color:var(--muted)">
+          <span>${label}</span><span style="font-weight:600;color:${col}">${typeof val === 'number' ? val.toFixed(1) : val}/${max}</span>
+        </div>
+        <div style="background:#DDE3EE;border-radius:4px;height:6px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${col};border-radius:4px;transition:width .4s"></div>
+        </div>
+      </div>`;
+    };
+
+    // Grands KPIs visuels (pour COMEN/CEJ_EL et standard)
+    const kpiCard = (label, value, sub, color) => `
+      <div style="background:var(--surface);border-radius:12px;padding:16px;border-top:3px solid ${color};text-align:center">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">${label}</div>
+        <div style="font-size:28px;font-weight:700;color:${color};font-family:'DM Mono',monospace;line-height:1">${value}</div>
+        ${sub ? `<div style="font-size:11px;color:var(--hint);margin-top:6px">${sub}</div>` : ''}
+      </div>`;
+
     // Build HTML
     el.innerHTML = `
       <div style="max-width:1000px;margin:0 auto;padding:2rem">
 
         <!-- Header -->
-        <div style="text-align:center;margin-bottom:3rem;padding-bottom:2rem;border-bottom:2px solid var(--border)">
-          <h1 style="margin:0;font-size:28px;color:var(--navy);margin-bottom:8px">Rapport Final de Compétition</h1>
-          <div style="font-size:14px;color:var(--muted);margin-bottom:12px">${comp.nom}</div>
-          <div style="display:flex;justify-content:center;gap:24px;font-size:13px;color:var(--text)">
-            <div><strong>${comp.date_debut?.split('-')[2]}/${comp.date_debut?.split('-')[1]}</strong> au <strong>${comp.date_fin?.split('-')[2]}/${comp.date_fin?.split('-')[1]}</strong></div>
-            <div><strong>${uniqueCoaches}</strong> entraîneur(s) · <strong>${uniqueAthletes}</strong> nageur(s)</div>
+        <div style="text-align:center;margin-bottom:2.5rem;padding-bottom:2rem;border-bottom:2px solid var(--border)">
+          <div style="display:inline-block;background:var(--navy);color:#fff;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.08em;margin-bottom:12px;text-transform:uppercase">
+            ${comp.type_competition || 'Compétition internationale'}
+          </div>
+          <h1 style="margin:0 0 8px 0;font-size:26px;color:var(--navy)">${comp.nom}</h1>
+          <div style="font-size:13px;color:var(--muted)">${comp.lieu || ''} · ${fmtDate(comp.date_debut)} → ${fmtDate(comp.date_fin)}</div>
+          <div style="margin-top:12px;display:flex;justify-content:center;gap:20px;font-size:12px;color:var(--text)">
+            <div><strong style="color:var(--blue)">${uniqueCoaches}</strong> entraîneur(s)</div>
+            <div>·</div>
+            <div><strong style="color:var(--blue)">${uniqueAthletes}</strong> nageur(s)</div>
+            <div>·</div>
+            <div><strong style="color:var(--blue)">${allEvents.length}</strong> épreuve(s) programmée(s)</div>
           </div>
         </div>
 
         <!-- Synthèse Exécutive -->
-        <div style="background:var(--surface2);border-radius:8px;padding:1.5rem;margin-bottom:2rem">
-          <h2 style="margin:0 0 1rem 0;font-size:16px;color:var(--navy)">Synthèse Exécutive</h2>
-
-          <!-- Ligne 1 : 4 KPIs principaux -->
+        <div style="margin-bottom:2.5rem">
+          <h2 style="font-size:15px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem;display:flex;align-items:center;gap:8px">
+            <span style="display:inline-block;width:3px;height:16px;background:var(--blue-light);border-radius:2px"></span>
+            Synthèse des performances
+          </h2>
+          ${isSerieTour ? `
+          <!-- COMEN / CEJ_EL : classement au temps, pas de tours -->
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:1rem">
+            ${kpiCard('Minima battus', fmtPct(stats.pctEngagement), `${stats.engagementBattus} sur ${stats.totalAvecEngagement} épreuves`, '#1B4F8A')}
+            ${kpiCard('Places gagnées', nbPlacesGagnees > 0 ? '+' + nbPlacesGagnees : '—', moyPlacesGagnees ? `Moy. +${moyPlacesGagnees} par nageur` : 'vs ranking initial', '#1A7A4A')}
+          </div>
+          <div style="font-size:12px;line-height:1.7;color:var(--text);background:var(--surface2);border-radius:8px;padding:12px">
+            Sur <strong>${stats.totalAvecEngagement}</strong> épreuve(s) avec temps de référence,
+            <strong>${stats.engagementBattus}</strong> minima ${stats.engagementBattus > 1 ? 'ont été battus' : 'a été battu'} (<strong>${fmtPct(stats.pctEngagement)}</strong>).
+            ${avecRanking.length ? `Sur <strong>${avecRanking.length}</strong> nageur(s) avec ranking initial, <strong>${placesGagnees.length}</strong> ont progressé dans le classement${moyPlacesGagnees ? ` (moy. +${moyPlacesGagnees} place${parseFloat(moyPlacesGagnees)>1?'s':''})` : ''}.` : ''}
+          </div>
+          ` : `
+          <!-- Format standard avec tours -->
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1rem">
-            <div style="background:var(--surface);border-radius:8px;padding:12px;border-left:3px solid var(--blue-light)">
-              <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Demi-finales</div>
-              <div style="font-size:22px;color:var(--blue-light);font-weight:600;font-family:'DM Mono',monospace">${fmtPct(stats.pctDF)}</div>
-              <div style="font-size:11px;color:var(--hint)">${stats.nbDF} nageur(s) qualifié(s)</div>
-            </div>
-            <div style="background:var(--surface);border-radius:8px;padding:12px;border-left:3px solid var(--accent)">
-              <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Finales</div>
-              <div style="font-size:22px;color:var(--accent);font-weight:600;font-family:'DM Mono',monospace">${fmtPct(stats.pctFinale)}</div>
-              <div style="font-size:11px;color:var(--hint)">${stats.nbFinale} nageur(s) en finale</div>
-            </div>
-            <div style="background:var(--surface);border-radius:8px;padding:12px;border-left:3px solid var(--success)">
-              <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Podiums</div>
-              <div style="font-size:22px;color:var(--success);font-weight:600;font-family:'DM Mono',monospace">${fmtPct(stats.pctPodium)}</div>
-              <div style="font-size:11px;color:var(--hint)">${stats.nbPodium} podium(s)</div>
-            </div>
-            <div style="background:var(--surface);border-radius:8px;padding:12px;border-left:3px solid var(--accent2)">
-              <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Minima battus</div>
-              <div style="font-size:22px;color:var(--accent2);font-weight:600;font-family:'DM Mono',monospace">${fmtPct(stats.pctEngagement)}</div>
-              <div style="font-size:11px;color:var(--hint)">${stats.engagementBattus} sur ${stats.totalAvecEngagement} épreuves</div>
-            </div>
+            ${kpiCard('Demi-finales', fmtPct(stats.pctDF), `${stats.nbDF} nageur(s) qualifié(s)`, '#2563C4')}
+            ${kpiCard('Finales', fmtPct(stats.pctFinale), `${stats.nbFinale} nageur(s)`, '#E8632A')}
+            ${kpiCard('Podiums', fmtPct(stats.pctPodium), `${stats.nbPodium} médaille(s)`, '#1A7A4A')}
+            ${kpiCard('Minima battus', fmtPct(stats.pctEngagement), `${stats.engagementBattus}/${stats.totalAvecEngagement} épreuves`, '#F0A500')}
           </div>
-
-          <!-- Résumé textuel -->
-          <div style="font-size:13px;line-height:1.6;color:var(--text)">
-            La compétition s'est déroulée du <strong>${fmtDate(comp.date_debut)}</strong> au <strong>${fmtDate(comp.date_fin)}</strong>,
-            avec <strong>${uniqueCoaches} entraîneur(s)</strong> et <strong>${uniqueAthletes} nageur(s)</strong>.
-            ${stats.nbDF > 0 ? `<strong>${stats.nbDF} nageur(s)</strong> ont atteint les demi-finales (${fmtPct(stats.pctDF)} du quota national), ` : ''}
-            ${stats.nbFinale > 0 ? `<strong>${stats.nbFinale}</strong> ont disputé une finale (${fmtPct(stats.pctFinale)} de réussite), ` : ''}
-            dont <strong>${stats.nbPodium} podium(s)</strong>.
-            ${stats.totalAvecEngagement > 0 ? `Sur ${stats.totalAvecEngagement} épreuves avec temps de référence, <strong>${stats.engagementBattus} minima</strong> ont été battus (${fmtPct(stats.pctEngagement)}).` : ''}
+          <div style="font-size:12px;line-height:1.7;color:var(--text);background:var(--surface2);border-radius:8px;padding:12px">
+            ${stats.nbDF > 0 ? `<strong>${stats.nbDF}</strong> nageur(s) ont atteint les demi-finales (${fmtPct(stats.pctDF)}). ` : ''}
+            ${stats.nbFinale > 0 ? `<strong>${stats.nbFinale}</strong> ont disputé une finale (${fmtPct(stats.pctFinale)}). ` : ''}
+            ${stats.nbPodium > 0 ? `<strong>${stats.nbPodium}</strong> podium(s) — ${fmtPct(stats.pctPodium)} des finalistes. ` : ''}
+            ${stats.totalAvecEngagement > 0 ? `Minima battus : <strong>${stats.engagementBattus}</strong> sur <strong>${stats.totalAvecEngagement}</strong> épreuves (${fmtPct(stats.pctEngagement)}).` : ''}
           </div>
+          `}
         </div>
 
         <!-- Phase Préparation -->
-        <div style="margin-bottom:2rem">
-          <h2 style="font-size:16px;color:var(--navy);border-bottom:2px solid var(--teal);padding-bottom:8px;margin-bottom:1rem">Phase de Préparation</h2>
-          <div style="background:var(--surface2);border-left:4px solid var(--teal);padding:1rem;border-radius:4px">
-            <div style="font-size:13px;line-height:1.6;color:var(--text)">
-              ${precompData ? `
-                <div style="margin-bottom:8px"><strong>État du Groupe:</strong></div>
-                <div style="margin-bottom:12px;padding-left:1rem;font-size:12px">
-                  • Forme générale: ${precompData.groupe_forme_generale || '—'}/5<br/>
-                  • Motivation: ${precompData.groupe_motivation || '—'}/5<br/>
-                  • Cohésion: ${precompData.groupe_cohesion || '—'}/5
-                </div>
-                <div><strong>État des Préparatifs:</strong></div>
-                <div style="margin-bottom:8px;padding-left:1rem;font-size:12px;color:var(--muted)">Logistique: ${avgStaffLogistique}/5</div>
-              ` : '<div style="color:var(--hint);font-size:12px">Données de préparation non disponibles</div>'}
-            </div>
+        <div style="margin-bottom:2.5rem">
+          <h2 style="font-size:15px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem;display:flex;align-items:center;gap:8px">
+            <span style="display:inline-block;width:3px;height:16px;background:var(--teal);border-radius:2px"></span>
+            Phase de préparation
+          </h2>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem">
+            ${precompData ? `
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:${precompData.objectifs_groupe ? '1rem' : '0'}">
+                ${svgGauge(precompData.groupe_forme_generale, 5, null, 'Forme groupe')}
+                ${svgGauge(precompData.groupe_motivation, 5, null, 'Motivation')}
+                ${svgGauge(precompData.groupe_cohesion, 5, null, 'Cohésion')}
+              </div>
+              ${avgStaffLogistique ? `<div style="margin-bottom:8px">${progressBar(parseFloat(avgStaffLogistique), 5, null, 'Logistique moyenne')}</div>` : ''}
+              ${precompData.objectifs_groupe ? `<div style="font-size:12px;color:var(--text);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)"><strong>Objectifs groupe :</strong> ${precompData.objectifs_groupe}</div>` : ''}
+            ` : '<div style="color:var(--hint);font-size:12px;text-align:center;padding:1rem">Données de préparation non disponibles</div>'}
           </div>
         </div>
 
         <!-- Phase Compétition -->
-        <div style="margin-bottom:2rem">
-          <h2 style="font-size:16px;color:var(--navy);border-bottom:2px solid var(--accent);padding-bottom:8px;margin-bottom:1rem">Phase de Compétition</h2>
-          <div style="background:var(--surface2);border-left:4px solid var(--accent);padding:1rem;border-radius:4px">
-            <div style="font-size:13px;line-height:1.6;color:var(--text)">
-              <div style="margin-bottom:12px">
-                <strong>Performance Générale:</strong><br/>
-                <div style="margin-top:8px;padding-left:1rem;font-size:12px">
-                  • Nageurs en compétition : <strong>${uniqueAthletes}</strong><br/>
-                  • Demi-finales : <strong>${stats.nbDF}</strong> nageur(s) — <strong>${fmtPct(stats.pctDF)}</strong> du quota national<br/>
-                  • Finales : <strong>${stats.nbFinale}</strong> nageur(s) — <strong>${fmtPct(stats.pctFinale)}</strong> de réussite<br/>
-                  • Podiums : <strong>${stats.nbPodium}</strong> — <strong>${fmtPct(stats.pctPodium)}</strong> des finalistes<br/>
-                  • Minima battus : <strong>${stats.engagementBattus}</strong> sur <strong>${stats.totalAvecEngagement}</strong> épreuves (<strong>${fmtPct(stats.pctEngagement)}</strong>)
-                </div>
+        <div style="margin-bottom:2.5rem">
+          <h2 style="font-size:15px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem;display:flex;align-items:center;gap:8px">
+            <span style="display:inline-block;width:3px;height:16px;background:var(--accent);border-radius:2px"></span>
+            Phase de compétition
+          </h2>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+              <div>
+                <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Dynamique d'équipe</div>
+                ${avgStaffVie ? progressBar(parseFloat(avgStaffVie), 5, null, 'Qualité de vie groupe') : ''}
+                <div style="font-size:12px;color:var(--muted);margin-top:6px">Interventions médicales : <strong>${medicalInterventions}</strong></div>
+                <div style="font-size:12px;color:var(--muted)">Jours de suivi staff : <strong>${allStaffEntries.length}</strong></div>
               </div>
               <div>
-                <strong>Dynamique d'Équipe:</strong><br/>
-                <div style="margin-top:8px;padding-left:1rem;font-size:12px">
-                  • Qualité de vie: ${avgStaffVie}/5<br/>
-                  • Interventions médicales: ${medicalInterventions}<br/>
-                  • Jours de suivi: ${allStaffEntries.length}
-                </div>
+                <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Forme des entraîneurs</div>
+                ${Object.values(formeByCoachR).length ? Object.values(formeByCoachR).map(({coach, scores}) => {
+                  const moy = scores.length ? scores.reduce((a,b)=>a+b,0)/scores.length : null;
+                  return progressBar(moy, 5, null, `${coach.prenom} ${coach.nom}`);
+                }).join('') : '<div style="font-size:12px;color:var(--hint)">Aucune donnée</div>'}
               </div>
             </div>
           </div>
         </div>
 
         <!-- Résultats détaillés par nageur -->
-        <div style="margin-bottom:2rem">
-          <h2 style="font-size:16px;color:var(--navy);border-bottom:2px solid var(--accent);padding-bottom:8px;margin-bottom:1rem">Résultats Individuels</h2>
+        <div style="margin-bottom:2.5rem">
+          <h2 style="font-size:15px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem;display:flex;align-items:center;gap:8px">
+            <span style="display:inline-block;width:3px;height:16px;background:var(--accent);border-radius:2px"></span>
+            Résultats individuels
+          </h2>
 
           ${(() => {
             const byAthlete = {};
@@ -1245,12 +1284,17 @@ function renderRapportFinal() {
                 const order = ['serie','demi-finale','finale'];
                 return order.indexOf(a.events?.tour) - order.indexOf(b.events?.tour);
               }).map(r => {
-                const engBattu = r.a_nage && r.events?.temps_engagement && r.temps &&
-                                 compareTemps(r.temps, r.events.temps_engagement) < 0;
+                const _ref3 = r.events?.temps_engagement;
+                const _hasT3 = r.a_nage && r.temps && r.temps !== '0';
+                const _cmp3 = (_hasT3 && _ref3) ? compareTemps(r.temps, _ref3) : null;
+                const _ts3 = _cmp3 === null ? '' :
+                  _cmp3 < 0  ? 'background:#d4edda;color:#155724;border-radius:4px;padding:2px 6px;border:1px solid #a3d4aa' :
+                  _cmp3 === 0 ? 'background:#fff3cd;color:#856404;border-radius:4px;padding:2px 6px;border:1px solid #ffc107' :
+                                'background:#fde8e8;color:#922b21;border-radius:4px;padding:2px 6px;border:1px solid #f5b7b1';
                 return `<tr>
                   <td style="font-size:11px">${r.events?.epreuve}</td>
                   <td>${badgeTour(r.events?.tour)}</td>
-                  <td style="font-family:'DM Mono',monospace;font-size:11px">${r.temps || '—'}${engBattu ? ' <span style="color:var(--success)">↓</span>' : ''}</td>
+                  <td style="font-family:'DM Mono',monospace;font-size:11px"><span style="${_ts3}">${r.temps || '—'}</span></td>
                   <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.temps_engagement || '—'}</td>
                   <td>${r.rang ? `<span class="badge ${r.rang<=3?'badge-green':r.rang<=8?'badge-orange':'badge-gray'}">${r.rang<=3?'🏅 ':''}${r.rang}</span>` : r.a_nage ? '—' : '<span class="badge badge-red">DNS</span>'}</td>
                 </tr>`;
@@ -1274,34 +1318,38 @@ function renderRapportFinal() {
         </div>
 
         <!-- Phase Bilan -->
-        <div style="margin-bottom:2rem">
-          <h2 style="font-size:16px;color:var(--navy);border-bottom:2px solid var(--success);padding-bottom:8px;margin-bottom:1rem">Phase de Bilan</h2>
-          <div style="background:var(--surface2);border-left:4px solid var(--success);padding:1rem;border-radius:4px">
-            <div style="font-size:13px;line-height:1.6;color:var(--text)">
-              ${postcompData ? `
-                <div style="margin-bottom:12px">
-                  <strong>Points Forts:</strong><br/>
-                  <div style="margin-top:8px;padding-left:1rem;font-size:12px;color:var(--text)">${postcompData.points_forts || 'Non renseigné'}</div>
-                </div>
-                <div style="margin-bottom:12px">
-                  <strong>Points à Améliorer:</strong><br/>
-                  <div style="margin-top:8px;padding-left:1rem;font-size:12px;color:var(--text)">${postcompData.points_ameliorer || 'Non renseigné'}</div>
+        <div style="margin-bottom:2.5rem">
+          <h2 style="font-size:15px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem;display:flex;align-items:center;gap:8px">
+            <span style="display:inline-block;width:3px;height:16px;background:var(--success);border-radius:2px"></span>
+            Phase de bilan
+          </h2>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem">
+            ${postcompData ? `
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+                <div>
+                  <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Points forts</div>
+                  <div style="font-size:12px;color:var(--text);line-height:1.6">${postcompData.points_forts || '<span style="color:var(--hint)">Non renseigné</span>'}</div>
                 </div>
                 <div>
-                  <strong>Recommandations:</strong><br/>
-                  <div style="margin-top:8px;padding-left:1rem;font-size:12px;color:var(--text)">
-                    ${postcompData.recommandations_sport ? '<div>Domaine sportif: ' + postcompData.recommandations_sport + '</div>' : ''}
-                    ${postcompData.recommandations_orga ? '<div style="margin-top:4px">Domaine organisationnel: ' + postcompData.recommandations_orga + '</div>' : ''}
-                  </div>
+                  <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Points à améliorer</div>
+                  <div style="font-size:12px;color:var(--text);line-height:1.6">${postcompData.points_ameliorer || '<span style="color:var(--hint)">Non renseigné</span>'}</div>
                 </div>
-              ` : '<div style="color:var(--hint);font-size:12px">Données de bilan non disponibles</div>'}
-            </div>
+              </div>
+              ${postcompData.recommandations_sport || postcompData.recommandations_orga ? `
+              <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
+                <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Recommandations</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                  ${postcompData.recommandations_sport ? `<div style="font-size:12px"><strong style="color:var(--navy)">Sportif :</strong> ${postcompData.recommandations_sport}</div>` : ''}
+                  ${postcompData.recommandations_orga ? `<div style="font-size:12px"><strong style="color:var(--navy)">Organisationnel :</strong> ${postcompData.recommandations_orga}</div>` : ''}
+                </div>
+              </div>` : ''}
+            ` : '<div style="color:var(--hint);font-size:12px;text-align:center;padding:1rem">Données de bilan non disponibles</div>'}
           </div>
         </div>
 
         <!-- Footer -->
-        <div style="text-align:center;padding-top:2rem;border-top:1px solid var(--border);color:var(--muted);font-size:12px">
-          Rapport généré le ${new Date().toLocaleDateString('fr-FR')} · FFN Journal de bord
+        <div style="text-align:center;padding:1.5rem 0;border-top:1px solid var(--border);color:var(--hint);font-size:11px;letter-spacing:.04em">
+          FFN · Journal de compétition · Rapport généré le ${new Date().toLocaleDateString('fr-FR')}
         </div>
 
       </div>
