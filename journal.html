@@ -1778,6 +1778,7 @@ async function loadRelaySection() {
     .select('*, relay_athletes(position, athletes(id, prenom, nom)), relay_results(id, temps_final, rang, relay_splits(athlete_id, position, temps_passage))')
     .eq('competition_id', activeCompId)
     .eq('coach_id', activeCoachId)
+    .eq('date_epreuve', currentDate)
     .order('date_epreuve');
   if (error) return;
   const section = document.getElementById('relay-section');

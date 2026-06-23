@@ -436,7 +436,7 @@ async function loadAllData() {
     applyCoachFilter(sb.from('voyage_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
     applyCoachFilter(sb.from('precomp_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
     sb.from('relay_events').select('*').eq('competition_id', activeCompId),
-    sb.from('relay_results').select('*, relay_events(*)').eq('relay_events.competition_id', activeCompId),
+    sb.from('relay_results').select('*, relay_events(*), coaches(prenom, nom)').eq('relay_events.competition_id', activeCompId),
   ]);
   activeComp        = comp.data || null;
   allJournals       = j.data   || [];
@@ -616,16 +616,16 @@ function renderSynthese() {
     const vals = [j.forme_physique, j.forme_psychologique].filter(v => v);
     return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
   };
-  // Grouper toutes les entrées par coach (non filtré par date)
+  // Grouper les entrées par coach (filtré par date/coach)
   const allByCoachSynth = {};
-  allJournals.forEach(j => {
+  journals.forEach(j => {
     if (!allByCoachSynth[j.coach_id]) allByCoachSynth[j.coach_id] = { coach: j.coaches, entries: [] };
     allByCoachSynth[j.coach_id].entries.push(j);
   });
   Object.values(allByCoachSynth).forEach(c => c.entries.sort((a, b) => a.date_entree.localeCompare(b.date_entree)));
 
-  // Nombre de jours de compétition (jours distincts dans allJournals)
-  const totalJours = new Set(allJournals.map(j => j.date_entree)).size;
+  // Nombre de jours de compétition (jours distincts dans les entrées filtrées)
+  const totalJours = new Set(journals.map(j => j.date_entree)).size;
 
   const coachesList = document.getElementById('coaches-etat-list');
   const coachList = Object.values(allByCoachSynth);
@@ -747,7 +747,7 @@ function renderResultats() {
   });
   allRelayResults.forEach(rr => {
     if (!rr.rang) return;
-    const nom = rr.relay_events?.epreuve; if (!nom) return;
+    const nom = rr.relay_events?.type_relais; if (!nom) return;
     ensureEpr(nom);
     eprStats[nom].rang.push(rr.rang);
     eprStats[nom].isRelay = true;
@@ -815,6 +815,13 @@ function renderResultats() {
     if (!byEpreuve[nom]) byEpreuve[nom] = [];
     byEpreuve[nom].push(r);
   });
+  // Ajouter les relais
+  allRelayResults.forEach(rr => {
+    const nom = rr.relay_events?.type_relais;
+    if (!nom) return;
+    if (!byEpreuve[nom]) byEpreuve[nom] = [];
+    byEpreuve[nom].push({ _isRelay: true, rr });
+  });
 
   const epreuveOrder = ['serie','demi-finale','finale'];
   const epreuveEl = document.getElementById('results-by-epreuve');
@@ -830,6 +837,30 @@ function renderResultats() {
       });
 
       const rowsHtml = rows.map(r => {
+        if (r._isRelay) {
+          const rr = r.rr;
+          const ref = rr.relay_events?.temps_engagement;
+          let tempsCmp = null;
+          if (rr.temps_final && ref) tempsCmp = compareTemps(rr.temps_final, ref);
+          const tempsStyle = tempsCmp === null ? '' :
+            tempsCmp < 0  ? 'background:#d4edda;color:#155724;border-radius:4px;padding:2px 6px;border:1px solid #a3d4aa' :
+            tempsCmp === 0 ? 'background:#fff3cd;color:#856404;border-radius:4px;padding:2px 6px;border:1px solid #ffc107' :
+                             'background:#fde8e8;color:#922b21;border-radius:4px;padding:2px 6px;border:1px solid #f5b7b1';
+          const podium = rr.rang && rr.rang <= 3;
+          return `<tr style="background:var(--surface2)">
+            <td><span class="badge badge-gray" style="font-size:10px">RELAIS</span></td>
+            <td>${badgeTour(rr.relay_events?.tour)}</td>
+            <td style="font-family:'DM Mono',monospace;font-size:11px">${fmtDate(rr.relay_events?.date_epreuve)}</td>
+            <td><span class="badge badge-green">✓ Nagé</span></td>
+            <td style="font-family:'DM Mono',monospace;font-weight:500"><span style="${tempsStyle}">${rr.temps_final || '—'}</span></td>
+            <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${ref || '—'}</td>
+            <td>—</td>
+            <td>${rr.rang ? `<span class="badge ${podium ? 'badge-green' : rr.rang <= 8 ? 'badge-orange' : 'badge-gray'}">${podium ? '🏅 ' : ''}${rr.rang}</span>` : '—'}</td>
+            <td>—</td>
+            <td style="font-size:11px;color:var(--muted)">${rr.coaches?.prenom || ''} ${rr.coaches?.nom || ''}</td>
+            <td>—</td>
+          </tr>`;
+        }
         const ref = r.events?.temps_engagement;
         const hasTemps = r.a_nage && r.temps && r.temps !== '0';
         let tempsCmp = null;
@@ -864,7 +895,7 @@ function renderResultats() {
             ${rows.filter(r=>r.a_nage&&r.rang&&r.rang<=3).length ? `<span class="badge badge-green">🏅 ${rows.filter(r=>r.a_nage&&r.rang&&r.rang<=3).length} podium(s)</span>` : ''}
           </div>
           <table class="data-table">
-            <thead><tr><th>Nageur</th><th>Tour</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Réf.</th><th>Rang</th><th>Entraîneur</th><th>Observations</th></tr></thead>
+            <thead><tr><th>Nageur</th><th>Tour</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Réf.</th><th>Rang init.</th><th>Rang final</th><th>Δ</th><th>Entraîneur</th><th>Observations</th></tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
         </div>`;
