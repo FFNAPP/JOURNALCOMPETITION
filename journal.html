@@ -1826,7 +1826,6 @@ async function saveRelayResult(relayEventId, athletes) {
 
   const splitsPayload = athletes.map(a => ({
     relay_result_id: result.id,
-    coach_id:        activeCoachId,
     athlete_id:      a.athlete_id,
     position:        a.position,
     temps_passage:   (document.getElementById('relay-split-'+relayEventId+'-'+a.position)?.value || '').trim() || null
