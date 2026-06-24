@@ -2288,6 +2288,9 @@ async function savePostcompStaff() {
   const g  = id => document.getElementById(id)?.value || '';
   const gc = id => document.getElementById(id)?.checked || false;
   const gr = name => document.querySelector(`input[name="${name}"]:checked`)?.value || null;
+  // dep_date_depart/retour : colonne DB à migrer en TEXT (actuellement DATE → rejette "22/06 03h00")
+  // Workaround : on n'envoie la valeur que si elle est au format ISO YYYY-MM-DD, sinon null
+  const gdt = id => { const v = document.getElementById(id)?.value || ''; return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null; };
   const payload = {
     competition_id: activeCompId, coach_id: activeCoachId,
     resultats_conformes: gc('post-resultats-conformes'), resultats_obs: g('post-resultats-obs'),
@@ -2301,7 +2304,7 @@ async function savePostcompStaff() {
     log_mat_equipement_analyse: g('pcs-mat-equipement-analyse'), log_mat_equipement_analyse_obs: g('pcs-mat-equipement-analyse-obs'),
     log_mat_medical: g('pcs-mat-medical'), log_mat_medical_obs: g('pcs-mat-medical-obs'),
     log_problemes_admin: g('pcs-problemes-admin'),
-    dep_date_depart: g('dep-date-depart'), dep_date_retour: g('dep-date-retour'), dep_compagnie: g('dep-compagnie'),
+    dep_date_depart: gdt('dep-date-depart'), dep_date_retour: gdt('dep-date-retour'), dep_compagnie: g('dep-compagnie') || null,
     dep_incidents: g('dep-incidents'), dep_qualite_voyage: postcompStaffStars.dep_qualite_voyage,
     heb_nom: g('heb-nom'), heb_observations: g('heb-observations'),
     heb_qualite: postcompStaffStars.heb_qualite, heb_adequation: postcompStaffStars.heb_adequation, heb_proximite: postcompStaffStars.heb_proximite,
