@@ -326,6 +326,18 @@
       </div>
     </div>
 
+    <!-- Résultats non saisis -->
+    <div class="card" id="missing-results-card" style="margin-bottom:1rem;display:none">
+      <div class="card-head" style="cursor:pointer" onclick="toggleMissingResults()">
+        <div class="card-title">⚠️ Résultats non saisis</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="card-sub" id="missing-results-count">—</span>
+          <span id="missing-results-toggle-icon" style="font-size:12px;color:var(--muted)">▾</span>
+        </div>
+      </div>
+      <div id="missing-results-body"></div>
+    </div>
+
     <!-- Vue par épreuve -->
     <div class="card" style="margin-bottom:1rem">
       <div class="card-head">
@@ -412,6 +424,7 @@ let _dashRole = 'dtn', _dashCoachId = null;
 let allJournals = [], allResults = [], allNationObs = [], allEvents = [];
 let allStaffEntries = [], allPrecompStaff = [], allPostcompStaff = [], allVoyageEntries = [], allPrecompEntries = [];
 let allRelayEvents = [], allRelayResults = [];
+let allCompCoaches = [];
 let filterDate = 'all', filterCoach = 'all';
 let currentTab = 'synthese', currentStaffSubTab = 'comp';
 
@@ -468,7 +481,7 @@ async function onCompChange() {
 }
 
 async function loadAllData() {
-  const [comp, j, r, n, e, se, ps, pcs, voy, pc, re, rr] = await Promise.all([
+  const [comp, j, r, n, e, se, ps, pcs, voy, pc, re, rr, cc] = await Promise.all([
     sb.from('competitions').select('*').eq('id', activeCompId).single(),
     applyCoachFilter(sb.from('journal_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
     sb.from('results').select('*, events(*, athletes(*)), coaches(*)').eq('competition_id', activeCompId),
@@ -479,8 +492,9 @@ async function loadAllData() {
     applyCoachFilter(sb.from('postcomp_staff_entries').select('*').eq('competition_id', activeCompId)),
     applyCoachFilter(sb.from('voyage_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
     applyCoachFilter(sb.from('precomp_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
-    sb.from('relay_events').select('*').eq('competition_id', activeCompId),
+    sb.from('relay_events').select('*, coaches(prenom, nom)').eq('competition_id', activeCompId),
     sb.from('relay_results').select('*, relay_events(*), coaches(prenom, nom)').eq('relay_events.competition_id', activeCompId),
+    sb.from('competition_coaches').select('coach_id, coaches(id, prenom, nom)').eq('competition_id', activeCompId),
   ]);
   activeComp        = comp.data || null;
   allJournals       = j.data   || [];
@@ -494,6 +508,7 @@ async function loadAllData() {
   allPrecompEntries = pc.data  || [];
   allRelayEvents    = re.data  || [];
   allRelayResults   = (rr.data || []).filter(r => r.relay_events);
+  allCompCoaches    = (cc.data || []).map(row => row.coaches).filter(Boolean);
   buildFilters();
 }
 
@@ -1030,8 +1045,13 @@ function renderResultats() {
 
   // ── Table complète ───────────────────────────────────────
   const tbody = document.getElementById('results-full-list');
+  // Update header to add edit column
+  const thead = tbody.closest('table')?.querySelector('thead tr');
+  if (thead && thead.children.length === 12) {
+    const th = document.createElement('th'); th.textContent = ''; thead.appendChild(th);
+  }
   if (!results.length) {
-    tbody.innerHTML = '<tr><td colspan="12" class="empty">Aucun résultat</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" class="empty">Aucun résultat</td></tr>';
   } else {
     tbody.innerHTML = results.map(r => {
       const _ref2 = r.events?.temps_engagement;
@@ -1041,21 +1061,158 @@ function renderResultats() {
         _cmp2 < 0  ? 'background:#d4edda;color:#155724;border-radius:4px;padding:2px 6px;border:1px solid #a3d4aa' :
         _cmp2 === 0 ? 'background:#fff3cd;color:#856404;border-radius:4px;padding:2px 6px;border:1px solid #ffc107' :
                       'background:#fde8e8;color:#922b21;border-radius:4px;padding:2px 6px;border:1px solid #f5b7b1';
-      return `<tr>
+      const rid = r.event_id + '__' + r.coach_id;
+      return `<tr id="result-row-${rid}">
         <td><strong style="font-size:12px">${r.events?.athletes?.prenom} ${r.events?.athletes?.nom}</strong></td>
         <td style="font-size:11px">${r.events?.epreuve}</td>
         <td>${badgeTour(r.events?.tour)}</td>
         <td style="font-family:'DM Mono',monospace;font-size:11px">${fmtDate(r.events?.date_epreuve)}</td>
-        <td>${r.a_nage ? '<span class="badge badge-green">✓</span>' : '<span class="badge badge-red">✕</span>'}</td>
-        <td style="font-family:'DM Mono',monospace;font-weight:500"><span style="${_ts2}">${r.temps || '—'}</span></td>
+        <td id="result-anage-${rid}">${r.a_nage ? '<span class="badge badge-green">✓</span>' : '<span class="badge badge-red">✕</span>'}</td>
+        <td id="result-temps-${rid}" style="font-family:'DM Mono',monospace;font-weight:500"><span style="${_ts2}">${r.temps || '—'}</span></td>
         <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.temps_engagement || '—'}</td>
         <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.ranking_initial != null ? '#'+r.events.ranking_initial : '—'}</td>
-        <td>${r.rang ? `<span class="badge ${r.rang<=3?'badge-green':r.rang<=8?'badge-orange':'badge-gray'}">${r.rang}</span>` : '—'}</td>
+        <td id="result-rang-${rid}">${r.rang ? `<span class="badge ${r.rang<=3?'badge-green':r.rang<=8?'badge-orange':'badge-gray'}">${r.rang}</span>` : '—'}</td>
         <td>${fmtDelta(r.events?.ranking_initial, r.rang)}</td>
         <td style="font-size:11px;color:var(--muted)">${r.coaches?.prenom} ${r.coaches?.nom}</td>
         <td style="font-size:11px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.observations || '—'}</td>
+        <td style="white-space:nowrap">
+          <button id="result-edit-btn-${rid}" onclick="toggleResultEdit('${rid}','${r.event_id}','${r.coach_id}',${r.a_nage?1:0},'${r.temps||''}',${r.rang||'null'})"
+            style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--muted)">✏️</button>
+        </td>
       </tr>`;
     }).join('');
+  }
+
+  renderMissingResults();
+}
+
+function renderMissingResults() {
+  const card  = document.getElementById('missing-results-card');
+  const body  = document.getElementById('missing-results-body');
+  const countEl = document.getElementById('missing-results-count');
+
+  // Individual: events with no result at all
+  const resultedEventIds = new Set(allResults.map(r => r.event_id));
+  const missingIndiv = allEvents.filter(e => !resultedEventIds.has(e.id));
+
+  // Relay: relay_events with no relay_result
+  const resultedRelayIds = new Set(allRelayResults.map(r => r.relay_event_id));
+  const missingRelay = allRelayEvents.filter(re => !resultedRelayIds.has(re.id));
+
+  const total = missingIndiv.length + missingRelay.length;
+  if (!total) { card.style.display = 'none'; return; }
+
+  card.style.display = '';
+  countEl.textContent = total + ' épreuve(s) sans résultat';
+
+  const coachOpts = allCompCoaches.map(c => `<option value="${c.id}">${c.prenom} ${c.nom}</option>`).join('');
+
+  const indivRows = missingIndiv.map(ev => {
+    const ath = ev.athletes ? ev.athletes.prenom + ' ' + ev.athletes.nom : '—';
+    const tour = ev.tour ? ` <span class="badge badge-gray" style="font-size:9px">${ev.tour}</span>` : '';
+    return `<tr id="missing-row-${ev.id}">
+      <td style="font-size:12px;font-weight:600">${ath}</td>
+      <td style="font-size:11px">${ev.epreuve}${tour}</td>
+      <td style="font-size:11px;color:var(--muted)">${fmtDate(ev.date_epreuve)}</td>
+      <td style="text-align:center"><input type="checkbox" id="mr-anage-${ev.id}" checked></td>
+      <td><input type="text" id="mr-temps-${ev.id}" placeholder="1:23.45" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-family:'DM Mono',monospace;font-size:12px"></td>
+      <td><input type="number" id="mr-rang-${ev.id}" placeholder="Rang" min="1" style="width:60px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px"></td>
+      <td><select id="mr-coach-${ev.id}" style="padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:11px"><option value="">— coach —</option>${coachOpts}</select></td>
+      <td><input type="text" id="mr-obs-${ev.id}" placeholder="Observations…" style="width:140px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:11px"></td>
+      <td><button onclick="saveMissingIndivResult('${ev.id}')" style="background:var(--blue);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600">Valider</button></td>
+    </tr>`;
+  }).join('');
+
+  const relayRows = missingRelay.map(re => {
+    const coachName = re.coaches ? re.coaches.prenom + ' ' + re.coaches.nom : '—';
+    return `<tr id="missing-relay-row-${re.id}">
+      <td style="font-size:12px;font-weight:600">${re.type_relais || '—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${coachName}</td>
+      <td style="font-size:11px;color:var(--muted)">${fmtDate(re.date_epreuve)}</td>
+      <td><input type="text" id="mr-rtps-${re.id}" placeholder="3:45.67" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-family:'DM Mono',monospace;font-size:12px"></td>
+      <td><input type="number" id="mr-rrang-${re.id}" placeholder="Rang" min="1" style="width:60px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px"></td>
+      <td><button onclick="saveMissingRelayResult('${re.id}')" style="background:var(--blue);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600">Valider</button></td>
+    </tr>`;
+  }).join('');
+
+  body.innerHTML = `<div style="padding:0 0 8px 0;overflow-x:auto">
+    ${indivRows ? `
+    <div style="padding:8px 12px 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Épreuves individuelles (${missingIndiv.length})</div>
+    <table class="data-table" style="margin-bottom:8px">
+      <thead><tr><th>Nageur</th><th>Épreuve</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Rang</th><th>Coach</th><th>Observations</th><th></th></tr></thead>
+      <tbody>${indivRows}</tbody>
+    </table>` : ''}
+    ${relayRows ? `
+    <div style="padding:8px 12px 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Relais (${missingRelay.length})</div>
+    <table class="data-table">
+      <thead><tr><th>Relais</th><th>Référent</th><th>Date</th><th>Temps final</th><th>Rang</th><th></th></tr></thead>
+      <tbody>${relayRows}</tbody>
+    </table>` : ''}
+  </div>`;
+}
+
+function toggleMissingResults() {
+  const body = document.getElementById('missing-results-body');
+  const icon = document.getElementById('missing-results-toggle-icon');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : '';
+  icon.textContent = open ? '▾' : '▴';
+}
+
+async function saveMissingIndivResult(eventId) {
+  const coachId = document.getElementById('mr-coach-' + eventId)?.value;
+  if (!coachId) { alert('Veuillez sélectionner un entraîneur.'); return; }
+  const anage   = document.getElementById('mr-anage-' + eventId)?.checked ?? true;
+  const temps   = (document.getElementById('mr-temps-' + eventId)?.value || '').trim() || null;
+  const rang    = parseInt(document.getElementById('mr-rang-' + eventId)?.value) || null;
+  const obs     = (document.getElementById('mr-obs-' + eventId)?.value || '').trim() || null;
+
+  const btn = document.querySelector(`#missing-row-${eventId} button`);
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
+  const { error } = await sb.from('results').upsert({
+    event_id:       eventId,
+    coach_id:       coachId,
+    competition_id: activeCompId,
+    a_nage:         anage,
+    temps:          anage ? temps : null,
+    rang:           anage ? rang  : null,
+    observations:   obs,
+  }, { onConflict: 'event_id,coach_id' });
+
+  if (error) {
+    alert('Erreur : ' + error.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Valider'; }
+  } else {
+    const row = document.getElementById('missing-row-' + eventId);
+    if (row) row.style.background = '#d4edda';
+    if (btn) { btn.textContent = '✓ Sauvegardé'; btn.style.background = 'var(--success)'; }
+    await loadAllData();
+    renderResultats();
+  }
+}
+
+async function saveMissingRelayResult(relayEventId) {
+  const temps = (document.getElementById('mr-rtps-' + relayEventId)?.value || '').trim() || null;
+  const rang  = parseInt(document.getElementById('mr-rrang-' + relayEventId)?.value) || null;
+  const btn = document.querySelector(`#missing-relay-row-${relayEventId} button`);
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
+  const { error } = await sb.from('relay_results').upsert({
+    relay_event_id: relayEventId,
+    temps_final:    temps,
+    rang:           rang,
+  }, { onConflict: 'relay_event_id' });
+
+  if (error) {
+    alert('Erreur : ' + error.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Valider'; }
+  } else {
+    const row = document.getElementById('missing-relay-row-' + relayEventId);
+    if (row) row.style.background = '#d4edda';
+    if (btn) { btn.textContent = '✓ Sauvegardé'; btn.style.background = 'var(--success)'; }
+    await loadAllData();
+    renderResultats();
   }
 }
 
@@ -1065,6 +1222,80 @@ function toggleResultsTable() {
   const visible = wrap.style.display !== 'none';
   wrap.style.display = visible ? 'none' : '';
   btn.textContent = visible ? 'Afficher ▾' : 'Masquer ▴';
+}
+
+function toggleResultEdit(rid, eventId, coachId, anage, temps, rang) {
+  const editBtn = document.getElementById('result-edit-btn-' + rid);
+  const editing = editBtn.dataset.editing === '1';
+  if (editing) {
+    // Cancel — restore display values
+    editBtn.dataset.editing = '0';
+    editBtn.textContent = '✏️';
+    editBtn.style.borderColor = 'var(--border)';
+    editBtn.style.color = 'var(--muted)';
+    // Remove sibling cancel btn if present
+    const cancel = document.getElementById('result-cancel-btn-' + rid);
+    if (cancel) cancel.remove();
+    renderResultats();
+    return;
+  }
+  // Enter edit mode
+  editBtn.dataset.editing = '1';
+  editBtn.textContent = '💾 Sauv.';
+  editBtn.style.background = 'var(--blue)';
+  editBtn.style.color = '#fff';
+  editBtn.style.borderColor = 'var(--blue)';
+  editBtn.onclick = () => saveResultEdit(rid, eventId, coachId);
+
+  // Insert cancel button next to save
+  const cancel = document.createElement('button');
+  cancel.id = 'result-cancel-btn-' + rid;
+  cancel.textContent = '✕';
+  cancel.style.cssText = 'background:none;border:1px solid var(--border);border-radius:5px;padding:3px 6px;font-size:11px;cursor:pointer;color:var(--muted);margin-left:4px';
+  cancel.onclick = () => { editBtn.dataset.editing = '1'; toggleResultEdit(rid, eventId, coachId, anage, temps, rang); };
+  editBtn.after(cancel);
+
+  // Replace A nagé cell
+  const anageCell = document.getElementById('result-anage-' + rid);
+  anageCell.innerHTML = `<input type="checkbox" id="re-anage-${rid}" ${anage ? 'checked' : ''}>`;
+
+  // Replace Temps cell
+  const tempsCell = document.getElementById('result-temps-' + rid);
+  tempsCell.innerHTML = `<input type="text" id="re-temps-${rid}" value="${temps}" placeholder="1:23.45" style="width:72px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;font-family:'DM Mono',monospace;font-size:12px">`;
+
+  // Replace Rang cell
+  const rangCell = document.getElementById('result-rang-' + rid);
+  rangCell.innerHTML = `<input type="number" id="re-rang-${rid}" value="${rang !== 'null' ? rang : ''}" min="1" placeholder="Rang" style="width:52px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;font-size:12px">`;
+}
+
+async function saveResultEdit(rid, eventId, coachId) {
+  const btn   = document.getElementById('result-edit-btn-' + rid);
+  const anage = document.getElementById('re-anage-' + rid)?.checked ?? true;
+  const temps = (document.getElementById('re-temps-' + rid)?.value || '').trim() || null;
+  const rang  = parseInt(document.getElementById('re-rang-' + rid)?.value) || null;
+
+  btn.disabled = true; btn.textContent = '…';
+
+  const { error } = await sb.from('results').update({
+    a_nage: anage,
+    temps:  anage ? temps : null,
+    rang:   anage ? rang  : null,
+  }).eq('event_id', eventId).eq('coach_id', coachId);
+
+  if (error) {
+    alert('Erreur : ' + error.message);
+    btn.disabled = false; btn.textContent = '💾 Sauv.';
+  } else {
+    const row = document.getElementById('result-row-' + rid);
+    if (row) { row.style.background = '#d4edda'; setTimeout(() => { row.style.background = ''; }, 1500); }
+    await loadAllData();
+    renderResultats();
+    // Re-open table
+    const wrap = document.getElementById('results-table-wrap');
+    if (wrap) wrap.style.display = '';
+    const toggle = document.getElementById('results-table-toggle');
+    if (toggle) toggle.textContent = 'Masquer ▴';
+  }
 }
 
 function renderEntraineurs() {
