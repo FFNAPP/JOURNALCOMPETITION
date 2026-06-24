@@ -249,6 +249,42 @@
 
   <div class="main" id="tab-resultats" style="display:none">
 
+    <!-- Tableau des médailles -->
+    <div class="card" id="medals-card" style="margin-bottom:16px;display:none">
+      <div class="card-head"><div class="card-title">🏅 Tableau des médailles</div></div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="medals-table">
+          <thead><tr>
+            <th>Nageur / Relais</th>
+            <th style="text-align:center">🥇 Or</th>
+            <th style="text-align:center">🥈 Argent</th>
+            <th style="text-align:center">🥉 Bronze</th>
+            <th style="text-align:center">Total</th>
+            <th>Épreuve(s)</th>
+          </tr></thead>
+          <tbody id="medals-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Résumé places gagnées par nageur -->
+    <div class="card" id="places-card" style="margin-bottom:16px;display:none">
+      <div class="card-head"><div class="card-title">📈 Places gagnées par nageur</div></div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="places-table">
+          <thead><tr>
+            <th>Nageur</th>
+            <th style="text-align:center">Épreuves avec ranking</th>
+            <th style="text-align:center">Places gagnées</th>
+            <th style="text-align:center">Places perdues</th>
+            <th style="text-align:center">Solde total</th>
+            <th style="text-align:center">Moy. / épreuve</th>
+          </tr></thead>
+          <tbody id="places-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- KPIs statistiques -->
     <div class="kpi-row" id="results-kpi-row" style="grid-template-columns:repeat(4,1fr)">
       <div class="kpi-card blue" id="kpi-df-card">
@@ -698,6 +734,92 @@ function renderSynthese() {
 function renderResultats() {
   const { results } = getFiltered();
   document.getElementById('results-count-label').textContent = results.length + ' résultat(s)';
+
+  // ── Tableau des médailles ────────────────────────────────
+  const medalsCard = document.getElementById('medals-card');
+  const medalsByAthlete = {};
+  const ensureMedal = (key, label, isRelay) => {
+    if (!medalsByAthlete[key]) medalsByAthlete[key] = { label, isRelay, or: [], argent: [], bronze: [] };
+  };
+  // Résultats individuels
+  results.filter(r => r.a_nage && r.rang && r.rang <= 3).forEach(r => {
+    const ath = r.events?.athletes;
+    if (!ath) return;
+    const key = r.events.athlete_id;
+    const label = `${ath.prenom} ${ath.nom}`;
+    ensureMedal(key, label, false);
+    const epr = `${r.events.epreuve}${r.events.tour && r.events.tour !== 'serie' ? ' ('+r.events.tour+')' : ''}`;
+    if (r.rang === 1) medalsByAthlete[key].or.push(epr);
+    else if (r.rang === 2) medalsByAthlete[key].argent.push(epr);
+    else if (r.rang === 3) medalsByAthlete[key].bronze.push(epr);
+  });
+  // Relais
+  allRelayResults.filter(rr => rr.rang && rr.rang <= 3).forEach(rr => {
+    const nom = rr.relay_events?.type_relais; if (!nom) return;
+    const key = 'relay_' + rr.relay_events.id;
+    const label = nom;
+    ensureMedal(key, label, true);
+    const epr = `${nom}${rr.relay_events.tour ? ' ('+rr.relay_events.tour+')' : ''}`;
+    if (rr.rang === 1) medalsByAthlete[key].or.push(epr);
+    else if (rr.rang === 2) medalsByAthlete[key].argent.push(epr);
+    else if (rr.rang === 3) medalsByAthlete[key].bronze.push(epr);
+  });
+
+  const medalists = Object.values(medalsByAthlete)
+    .sort((a, b) => b.or.length - a.or.length || b.argent.length - a.argent.length || b.bronze.length - a.bronze.length);
+
+  if (!medalists.length) {
+    medalsCard.style.display = 'none';
+  } else {
+    medalsCard.style.display = '';
+    document.getElementById('medals-tbody').innerHTML = medalists.map(m => {
+      const total = m.or.length + m.argent.length + m.bronze.length;
+      const allEpr = [...m.or, ...m.argent, ...m.bronze];
+      const relayBadge = m.isRelay ? `<span style="font-size:9px;background:#EBF0F8;color:var(--blue);padding:1px 5px;border-radius:10px;margin-left:4px;font-weight:600">RELAIS</span>` : '';
+      return `<tr>
+        <td><strong>${m.label}</strong>${relayBadge}</td>
+        <td style="text-align:center;font-size:16px">${m.or.length ? '🥇'.repeat(m.or.length) : '—'}</td>
+        <td style="text-align:center;font-size:16px">${m.argent.length ? '🥈'.repeat(m.argent.length) : '—'}</td>
+        <td style="text-align:center;font-size:16px">${m.bronze.length ? '🥉'.repeat(m.bronze.length) : '—'}</td>
+        <td style="text-align:center;font-weight:700;color:var(--navy)">${total}</td>
+        <td style="font-size:11px;color:var(--muted)">${allEpr.join(', ')}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Places gagnées par nageur ────────────────────────────
+  const placesCard = document.getElementById('places-card');
+  const placesByAth = {};
+  results.filter(r => r.a_nage && r.events?.ranking_initial != null && r.rang != null).forEach(r => {
+    const ath = r.events?.athletes; if (!ath) return;
+    const key = r.events.athlete_id;
+    if (!placesByAth[key]) placesByAth[key] = { label: `${ath.prenom} ${ath.nom}`, total: 0, count: 0, gained: 0, lost: 0 };
+    const delta = r.events.ranking_initial - r.rang;
+    placesByAth[key].total += delta;
+    placesByAth[key].count++;
+    if (delta > 0) placesByAth[key].gained += delta;
+    else if (delta < 0) placesByAth[key].lost += Math.abs(delta);
+  });
+
+  const placesList = Object.values(placesByAth).sort((a, b) => b.total - a.total);
+  if (!placesList.length) {
+    placesCard.style.display = 'none';
+  } else {
+    placesCard.style.display = '';
+    document.getElementById('places-tbody').innerHTML = placesList.map(p => {
+      const moy = p.count ? (p.total / p.count) : 0;
+      const soldeCol = p.total > 0 ? 'color:#155724;font-weight:700' : p.total < 0 ? 'color:#922b21;font-weight:700' : 'color:var(--muted)';
+      const moyCol   = moy > 0 ? 'color:#155724' : moy < 0 ? 'color:#922b21' : 'color:var(--muted)';
+      return `<tr>
+        <td><strong>${p.label}</strong></td>
+        <td style="text-align:center">${p.count}</td>
+        <td style="text-align:center;color:#155724">+${p.gained}</td>
+        <td style="text-align:center;color:#922b21">${p.lost ? '-'+p.lost : '—'}</td>
+        <td style="text-align:center;${soldeCol}">${p.total > 0 ? '+' : ''}${p.total}</td>
+        <td style="text-align:center;${moyCol}">${moy > 0 ? '+' : ''}${moy.toFixed(1)}</td>
+      </tr>`;
+    }).join('');
+  }
 
   // ── KPIs stats ──────────────────────────────────────────
   const stats = computeResultStats(results, allEvents);
