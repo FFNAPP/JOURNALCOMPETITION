@@ -1572,60 +1572,60 @@ function renderRapportFinal() {
           </div>
         </div>
 
-        <!-- Résultats détaillés par nageur -->
+        <!-- Résultats par nageur — synthèse -->
         <div style="margin-bottom:2.5rem">
           <h2 style="font-size:15px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem;display:flex;align-items:center;gap:8px">
             <span style="display:inline-block;width:3px;height:16px;background:var(--accent);border-radius:2px"></span>
-            Résultats individuels
+            Résultats par nageur
           </h2>
-
-          ${(() => {
-            const byAthlete = {};
-            allResults.forEach(r => {
-              const id = r.events?.athlete_id;
-              const name = r.events?.athletes ? r.events.athletes.prenom + ' ' + r.events.athletes.nom : '—';
-              if (!byAthlete[id]) byAthlete[id] = { name, results: [] };
-              byAthlete[id].results.push(r);
-            });
-
-            return Object.values(byAthlete).sort((a,b) => a.name.localeCompare(b.name)).map(({name, results}) => {
-              const nbNage = results.filter(r => r.a_nage).length;
-              const nbPodium = results.filter(r => r.a_nage && r.rang && r.rang <= 3).length;
-              const rows = results.sort((a,b) => {
-                const order = ['serie','demi-finale','finale'];
-                return order.indexOf(a.events?.tour) - order.indexOf(b.events?.tour);
-              }).map(r => {
-                const _ref3 = r.events?.temps_engagement;
-                const _hasT3 = r.a_nage && r.temps && r.temps !== '0';
-                const _cmp3 = (_hasT3 && _ref3) ? compareTemps(r.temps, _ref3) : null;
-                const _ts3 = _cmp3 === null ? '' :
-                  _cmp3 < 0  ? 'background:#d4edda;color:#155724;border-radius:4px;padding:2px 6px;border:1px solid #a3d4aa' :
-                  _cmp3 === 0 ? 'background:#fff3cd;color:#856404;border-radius:4px;padding:2px 6px;border:1px solid #ffc107' :
-                                'background:#fde8e8;color:#922b21;border-radius:4px;padding:2px 6px;border:1px solid #f5b7b1';
-                return `<tr>
-                  <td style="font-size:11px">${r.events?.epreuve}</td>
-                  <td>${badgeTour(r.events?.tour)}</td>
-                  <td style="font-family:'DM Mono',monospace;font-size:11px"><span style="${_ts3}">${r.temps || '—'}</span></td>
-                  <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.temps_engagement || '—'}</td>
-                  <td>${r.rang ? `<span class="badge ${r.rang<=3?'badge-green':r.rang<=8?'badge-orange':'badge-gray'}">${r.rang<=3?'🏅 ':''}${r.rang}</span>` : r.a_nage ? '—' : '<span class="badge badge-red">DNS</span>'}</td>
-                </tr>`;
-              }).join('');
-
-              return `<div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:10px">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                  <strong style="font-size:13px">${name}</strong>
-                  <div style="display:flex;gap:6px">
-                    <span class="badge badge-gray">${nbNage} épreuve(s)</span>
-                    ${nbPodium ? `<span class="badge badge-green">🏅 ${nbPodium} podium(s)</span>` : ''}
-                  </div>
-                </div>
-                <table class="data-table" style="background:var(--surface)">
-                  <thead><tr><th>Épreuve</th><th>Tour</th><th>Temps</th><th>Réf.</th><th>Rang</th></tr></thead>
-                  <tbody>${rows}</tbody>
-                </table>
-              </div>`;
-            }).join('');
-          })()}
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead><tr style="background:var(--surface2)">
+                <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--muted);font-weight:600">Nageur</th>
+                <th style="padding:8px 12px;text-align:center;font-size:11px;color:var(--muted);font-weight:600">Épreuves</th>
+                <th style="padding:8px 12px;text-align:center;font-size:11px;color:var(--muted);font-weight:600">% réf. battus</th>
+                <th style="padding:8px 12px;text-align:center;font-size:11px;color:var(--muted);font-weight:600">Meilleur rang</th>
+                ${isSerieTour ? `<th style="padding:8px 12px;text-align:center;font-size:11px;color:var(--muted);font-weight:600">Places gagnées</th>` : ''}
+                <th style="padding:8px 12px;text-align:center;font-size:11px;color:var(--muted);font-weight:600">Médailles</th>
+              </tr></thead>
+              <tbody>
+                ${(() => {
+                  const byAthlete = {};
+                  allResults.forEach(r => {
+                    const id = r.events?.athlete_id;
+                    if (!id) return;
+                    const name = r.events?.athletes ? r.events.athletes.prenom + ' ' + r.events.athletes.nom : '—';
+                    if (!byAthlete[id]) byAthlete[id] = { name, results: [] };
+                    byAthlete[id].results.push(r);
+                  });
+                  const medals = Object.assign({}, medR);
+                  return Object.values(byAthlete).sort((a,b) => a.name.localeCompare(b.name)).map(({name, results}, idx) => {
+                    const nage = results.filter(r => r.a_nage);
+                    const withRef = nage.filter(r => r.events?.temps_engagement && r.temps && r.temps !== '0');
+                    const beaten = withRef.filter(r => compareTemps(r.temps, r.events.temps_engagement) < 0);
+                    const pctRef = withRef.length ? Math.round(beaten.length / withRef.length * 100) + '%' : '—';
+                    const bestRang = nage.filter(r => r.rang).reduce((b, r) => b === null || r.rang < b ? r.rang : b, null);
+                    const id = results[0]?.events?.athlete_id;
+                    const med = medals[id] || { or: [], argent: [], bronze: [] };
+                    const medStr = [med.or.length ? `🥇${med.or.length > 1 ? '×'+med.or.length : ''}` : '', med.argent.length ? `🥈${med.argent.length > 1 ? '×'+med.argent.length : ''}` : '', med.bronze.length ? `🥉${med.bronze.length > 1 ? '×'+med.bronze.length : ''}` : ''].filter(Boolean).join(' ') || '—';
+                    const athDelta = isSerieTour ? (() => {
+                      const withRk = nage.filter(r => r.events?.ranking_initial != null && r.rang != null);
+                      const delta = withRk.reduce((s, r) => s + (r.events.ranking_initial - r.rang), 0);
+                      return withRk.length ? (delta > 0 ? `<span style="color:var(--success);font-weight:600">+${delta}</span>` : delta < 0 ? `<span style="color:var(--error)">${delta}</span>` : '<span style="color:var(--muted)">0</span>') : '—';
+                    })() : null;
+                    return `<tr style="background:${idx%2?'var(--surface2)':'var(--surface)'}">
+                      <td style="padding:8px 12px;font-weight:600;color:var(--navy)">${name}</td>
+                      <td style="padding:8px 12px;text-align:center">${nage.length}</td>
+                      <td style="padding:8px 12px;text-align:center;font-family:'DM Mono',monospace">${pctRef}</td>
+                      <td style="padding:8px 12px;text-align:center">${bestRang ? `<span class="badge ${bestRang<=3?'badge-green':bestRang<=8?'badge-orange':'badge-gray'}">${bestRang<=3?'🏅 ':''}${bestRang}</span>` : '—'}</td>
+                      ${isSerieTour ? `<td style="padding:8px 12px;text-align:center">${athDelta}</td>` : ''}
+                      <td style="padding:8px 12px;text-align:center">${medStr}</td>
+                    </tr>`;
+                  }).join('') || '<tr><td colspan="6" style="padding:12px;text-align:center;color:var(--hint)">Aucun résultat disponible</td></tr>';
+                })()}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Phase Bilan -->
@@ -1635,28 +1635,108 @@ function renderRapportFinal() {
             Phase de bilan
           </h2>
           <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem">
-            ${postcompData ? `
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+            ${postcompData ? (() => {
+              const e = postcompData;
+              const stars = n => n ? '★'.repeat(n)+'☆'.repeat(5-n) : '☆☆☆☆☆';
+              const bilanColors = {'Très positif':'#1A7A4A','Positif':'#1B4F8A','Mitigé':'#E8632A','Décevant':'#C0392B'};
+              const bilanRows = [['Sportif','bilan_sportif'],['Encadrement','bilan_encadrement'],['Logistique','bilan_logistique'],['Déplacement','bilan_deplacement'],['Organisation','bilan_organisation']];
+              const encRows = [['Communication staff ↔ nageurs','enc_communication'],['Cohésion interne du staff','enc_cohesion'],['Relation avec l\'organisation','enc_relation_orga'],['Gestion des imprévus','enc_gestion_imprevus']];
+              return `
+              <!-- Bilan par domaine + Encadrement -->
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1rem">
                 <div>
-                  <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Points forts</div>
-                  <div style="font-size:12px;color:var(--text);line-height:1.6">${postcompData.points_forts || '<span style="color:var(--hint)">Non renseigné</span>'}</div>
+                  <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Bilan par domaine</div>
+                  ${bilanRows.map(([lbl,k]) => `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
+                    <span style="font-size:12px">${lbl}</span>
+                    ${e[k] ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:${bilanColors[e[k]]||'#888'}22;color:${bilanColors[e[k]]||'#888'}">${e[k]}</span>` : '<span style="color:var(--hint);font-size:11px">—</span>'}
+                  </div>`).join('')}
+                  ${e.note_globale ? `<div style="margin-top:10px;display:flex;align-items:center;gap:8px"><span style="font-size:12px;font-weight:600">Note globale</span><span style="color:var(--accent2);font-size:14px">${stars(e.note_globale)}</span></div>` : ''}
                 </div>
                 <div>
-                  <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Points à améliorer</div>
-                  <div style="font-size:12px;color:var(--text);line-height:1.6">${postcompData.points_ameliorer || '<span style="color:var(--hint)">Non renseigné</span>'}</div>
+                  <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Encadrement</div>
+                  ${encRows.map(([lbl,k]) => `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
+                    <span style="font-size:12px;color:var(--muted)">${lbl}</span>
+                    <span style="color:var(--accent2);font-size:12px">${stars(e[k])}</span>
+                  </div>`).join('')}
                 </div>
               </div>
-              ${postcompData.recommandations_sport || postcompData.recommandations_orga ? `
-              <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
-                <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Recommandations</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-                  ${postcompData.recommandations_sport ? `<div style="font-size:12px"><strong style="color:var(--navy)">Sportif :</strong> ${postcompData.recommandations_sport}</div>` : ''}
-                  ${postcompData.recommandations_orga ? `<div style="font-size:12px"><strong style="color:var(--navy)">Organisationnel :</strong> ${postcompData.recommandations_orga}</div>` : ''}
-                </div>
+              <!-- Points forts / à améliorer -->
+              ${e.points_forts || e.points_ameliorer ? `
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;padding-top:1rem;border-top:1px solid var(--border)">
+                ${e.points_forts ? `<div>
+                  <div style="font-size:11px;font-weight:600;color:var(--success);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Points forts</div>
+                  <div style="font-size:12px;color:var(--text);line-height:1.6">${e.points_forts}</div>
+                </div>` : ''}
+                ${e.points_ameliorer ? `<div>
+                  <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Points à améliorer</div>
+                  <div style="font-size:12px;color:var(--text);line-height:1.6">${e.points_ameliorer}</div>
+                </div>` : ''}
               </div>` : ''}
-            ` : '<div style="color:var(--hint);font-size:12px;text-align:center;padding:1rem">Données de bilan non disponibles</div>'}
+              <!-- Recommandations -->
+              ${e.recommandations_sport || e.recommandations_orga ? `
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;padding-top:1rem;border-top:1px solid var(--border)">
+                ${e.recommandations_sport ? `<div>
+                  <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Recommandations sportives</div>
+                  <div style="font-size:12px;color:var(--text);line-height:1.6">${e.recommandations_sport}</div>
+                </div>` : ''}
+                ${e.recommandations_orga ? `<div>
+                  <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Recommandations organisationnelles</div>
+                  <div style="font-size:12px;color:var(--text);line-height:1.6">${e.recommandations_orga}</div>
+                </div>` : ''}
+              </div>` : ''}
+              <!-- Conclusions DTN -->
+              ${e.conclusions_dtn ? `
+              <div style="background:var(--surface2);border-radius:8px;padding:12px;border-left:3px solid var(--teal);margin-top:1rem">
+                <div style="font-size:11px;font-weight:600;color:var(--teal);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Conclusions DTN</div>
+                <div style="font-size:12px;color:var(--text);line-height:1.6">${e.conclusions_dtn}</div>
+              </div>` : ''}
+              `;
+            })() : '<div style="color:var(--hint);font-size:12px;text-align:center;padding:1rem">Données de bilan non disponibles</div>'}
           </div>
         </div>
+
+        <!-- Bilan voyage -->
+        ${allVoyageEntries.length ? `
+        <div style="margin-bottom:2.5rem">
+          <h2 style="font-size:15px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem;display:flex;align-items:center;gap:8px">
+            <span style="display:inline-block;width:3px;height:16px;background:var(--teal);border-radius:2px"></span>
+            Bilan voyage
+          </h2>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            ${['aller','retour'].map(type => {
+              const entries = allVoyageEntries.filter(e => e.type_journee === type);
+              if (!entries.length) return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Voyage ${type}</div><div style="color:var(--hint);font-size:12px">Aucune donnée</div></div>`;
+              const avgForme = entries.map(e => [e.forme_physique, e.forme_psychologique].filter(Boolean)).flat();
+              const moyForme = avgForme.length ? (avgForme.reduce((a,b)=>a+b,0)/avgForme.length).toFixed(1) : null;
+              const avgQV = entries.filter(e=>e.qualite_voyage).map(e=>e.qualite_voyage);
+              const moyQV = avgQV.length ? (avgQV.reduce((a,b)=>a+b,0)/avgQV.length).toFixed(1) : null;
+              const pbAdmins = entries.filter(e => e.probleme_admin && e.probleme_admin.toLowerCase() === 'oui');
+              const col = v => !v ? 'var(--hint)' : parseFloat(v) >= 4 ? 'var(--success)' : parseFloat(v) >= 3 ? 'var(--accent2)' : 'var(--error)';
+              return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem">
+                <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Voyage ${type} (${entries.length} saisie${entries.length>1?'s':''})</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+                  <div style="text-align:center">
+                    <div style="font-size:10px;color:var(--hint);margin-bottom:4px">Forme moy.</div>
+                    <div style="font-size:18px;font-weight:700;color:${col(moyForme)}">${moyForme||'—'}</div>
+                  </div>
+                  <div style="text-align:center">
+                    <div style="font-size:10px;color:var(--hint);margin-bottom:4px">Qualité voyage</div>
+                    <div style="font-size:18px;font-weight:700;color:${col(moyQV)}">${moyQV||'—'}</div>
+                  </div>
+                  <div style="text-align:center">
+                    <div style="font-size:10px;color:var(--hint);margin-bottom:4px">Pb. admin</div>
+                    <div style="font-size:18px;font-weight:700;color:${pbAdmins.length?'var(--error)':'var(--success)'}">${pbAdmins.length?'⚠️ '+pbAdmins.length:'✓'}</div>
+                  </div>
+                </div>
+                ${entries.map(e => `<div style="font-size:11px;border-top:1px solid var(--border);padding-top:6px;margin-top:6px">
+                  <strong>${e.coaches?.prenom||''} ${e.coaches?.nom||''}</strong>
+                  ${e.attente ? ` · <span style="color:var(--muted)">Attente : ${e.attente}</span>` : ''}
+                  ${e.probleme_admin?.toLowerCase()==='oui' ? ` · <span style="color:var(--error)">⚠️ ${e.probleme_admin_obs||'Pb. admin'}</span>` : ''}
+                </div>`).join('')}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>` : ''}
 
         <!-- Footer -->
         <div style="text-align:center;padding:1.5rem 0;border-top:1px solid var(--border);color:var(--hint);font-size:11px;letter-spacing:.04em">
