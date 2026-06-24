@@ -249,11 +249,49 @@
 
   <div class="main" id="tab-resultats" style="display:none">
 
+    <!-- Ligne de synthèse : 3 blocs -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+
+      <!-- Bloc places gagnées -->
+      <div class="kpi-card green" style="margin:0">
+        <div class="kpi-label">Places gagnées</div>
+        <div class="kpi-value" id="stat-places-total" style="color:var(--success)">—</div>
+        <div class="kpi-sub" id="stat-places-detail">— nageurs / épreuves</div>
+      </div>
+
+      <!-- Bloc temps d'engagement -->
+      <div class="kpi-card" style="margin:0;border-left:3px solid var(--accent2)">
+        <div class="kpi-label">Temps d'engagement battus</div>
+        <div class="kpi-value" id="stat-eng-pct" style="color:var(--accent2)">—</div>
+        <div class="kpi-sub" id="stat-eng-detail">sur — épreuves chronométrées</div>
+      </div>
+
+      <!-- Bloc médailles -->
+      <div class="kpi-card" style="margin:0;border-left:3px solid #C9A227">
+        <div class="kpi-label">Médailles</div>
+        <div style="display:flex;align-items:center;gap:16px;margin:8px 0">
+          <div style="text-align:center">
+            <div style="font-size:22px">🥇</div>
+            <div style="font-size:20px;font-weight:700;color:#C9A227;font-family:'DM Mono',monospace" id="stat-med-or">—</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:22px">🥈</div>
+            <div style="font-size:20px;font-weight:700;color:#808080;font-family:'DM Mono',monospace" id="stat-med-argent">—</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:22px">🥉</div>
+            <div style="font-size:20px;font-weight:700;color:#CD7F32;font-family:'DM Mono',monospace" id="stat-med-bronze">—</div>
+          </div>
+        </div>
+        <div class="kpi-sub" id="stat-med-detail">— médaillé(s)</div>
+      </div>
+    </div>
+
     <!-- Tableau des médailles -->
     <div class="card" id="medals-card" style="margin-bottom:16px;display:none">
       <div class="card-head"><div class="card-title">🏅 Tableau des médailles</div></div>
       <div style="overflow-x:auto">
-        <table class="data-table" id="medals-table">
+        <table class="data-table">
           <thead><tr>
             <th>Nageur / Relais</th>
             <th style="text-align:center">🥇 Or</th>
@@ -267,11 +305,14 @@
       </div>
     </div>
 
+    <!-- Meilleures épreuves -->
+    <div id="results-top-epreuves" style="margin-bottom:1rem"></div>
+
     <!-- Résumé places gagnées par nageur -->
-    <div class="card" id="places-card" style="margin-bottom:16px;display:none">
+    <div class="card" id="places-card" style="margin-bottom:1rem;display:none">
       <div class="card-head"><div class="card-title">📈 Places gagnées par nageur</div></div>
       <div style="overflow-x:auto">
-        <table class="data-table" id="places-table">
+        <table class="data-table">
           <thead><tr>
             <th>Nageur</th>
             <th style="text-align:center">Épreuves avec ranking</th>
@@ -284,39 +325,6 @@
         </table>
       </div>
     </div>
-
-    <!-- KPIs statistiques -->
-    <div class="kpi-row" id="results-kpi-row" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi-card blue" id="kpi-df-card">
-        <div class="kpi-label">Demi-finales</div>
-        <div class="kpi-value" id="stat-df-pct">—</div>
-        <div class="kpi-sub" id="stat-df-detail">— nageurs qualifiés</div>
-      </div>
-      <div class="kpi-card accent" id="kpi-fin-card">
-        <div class="kpi-label">Finales</div>
-        <div class="kpi-value" id="stat-fin-pct">—</div>
-        <div class="kpi-sub" id="stat-fin-detail">— nageurs en finale</div>
-      </div>
-      <div class="kpi-card green" id="kpi-pod-card">
-        <div class="kpi-label">Podiums</div>
-        <div class="kpi-value" id="stat-pod-pct">—</div>
-        <div class="kpi-sub" id="stat-pod-detail">— podiums</div>
-      </div>
-      <!-- KPI places gagnées (COMEN/CEJ_EL) -->
-      <div class="kpi-card green" id="kpi-places-card" style="display:none">
-        <div class="kpi-label">Places gagnées</div>
-        <div class="kpi-value" id="stat-places-total">—</div>
-        <div class="kpi-sub" id="stat-places-detail">— nageurs / épreuves</div>
-      </div>
-      <div class="kpi-card" style="border-left:3px solid var(--accent2)">
-        <div class="kpi-label">Temps d'engagement battus</div>
-        <div class="kpi-value" id="stat-eng-pct" style="color:var(--accent2)">—</div>
-        <div class="kpi-sub" id="stat-eng-detail">sur — épreuves chronométrées</div>
-      </div>
-    </div>
-
-    <!-- Meilleures épreuves -->
-    <div id="results-top-epreuves" style="margin-bottom:1rem"></div>
 
     <!-- Vue par épreuve -->
     <div class="card" style="margin-bottom:1rem">
@@ -821,36 +829,32 @@ function renderResultats() {
     }).join('');
   }
 
-  // ── KPIs stats ──────────────────────────────────────────
+  // ── Blocs de synthèse : places, engagement, médailles ───
   const stats = computeResultStats(results, allEvents);
   const fmtPct = (pct) => pct !== null ? pct + '%' : '—';
-  const isCOMEN = ['COMEN','CEJ_EL'].includes(activeComp?.type_competition);
 
-  // Masquer/afficher les KPI selon type de compétition
-  ['kpi-df-card','kpi-fin-card','kpi-pod-card'].forEach(id => {
-    document.getElementById(id).style.display = isCOMEN ? 'none' : '';
-  });
-  document.getElementById('kpi-places-card').style.display = isCOMEN ? '' : 'none';
-  document.getElementById('results-kpi-row').style.gridTemplateColumns = isCOMEN ? 'repeat(2,1fr)' : 'repeat(4,1fr)';
+  // Places gagnées (toujours affiché)
+  const avecRanking = results.filter(r => r.a_nage && r.events?.ranking_initial != null && r.rang != null);
+  const placesGagneesList = avecRanking.filter(r => r.events.ranking_initial - r.rang > 0);
+  const totalPlacesTop = placesGagneesList.reduce((s, r) => s + (r.events.ranking_initial - r.rang), 0);
+  document.getElementById('stat-places-total').textContent = totalPlacesTop > 0 ? '+' + totalPlacesTop : '0';
+  document.getElementById('stat-places-detail').textContent =
+    `${placesGagneesList.length} nageur(s) sur ${avecRanking.length} épreuve(s)`;
 
-  if (!isCOMEN) {
-    document.getElementById('stat-df-pct').textContent    = fmtPct(stats.pctDF);
-    document.getElementById('stat-df-detail').textContent = `${stats.nbDF} nageur(s) qualifié(s)`;
-    document.getElementById('stat-fin-pct').textContent   = fmtPct(stats.pctFinale);
-    document.getElementById('stat-fin-detail').textContent = `${stats.nbFinale} nageur(s) en finale`;
-    document.getElementById('stat-pod-pct').textContent   = fmtPct(stats.pctPodium);
-    document.getElementById('stat-pod-detail').textContent = `${stats.nbPodium} podium(s)`;
-  } else {
-    const avecRanking = results.filter(r => r.a_nage && r.events?.ranking_initial != null && r.rang != null);
-    const placesGagnees = avecRanking.filter(r => r.events.ranking_initial - r.rang > 0);
-    const totalPlaces = placesGagnees.reduce((s, r) => s + (r.events.ranking_initial - r.rang), 0);
-    document.getElementById('stat-places-total').textContent = totalPlaces > 0 ? '+' + totalPlaces : '0';
-    document.getElementById('stat-places-detail').textContent =
-      `${placesGagnees.length} nageur(s) sur ${avecRanking.length} épreuve(s)`;
-  }
-  document.getElementById('stat-eng-pct').textContent   = fmtPct(stats.pctEngagement);
+  // Engagement
+  document.getElementById('stat-eng-pct').textContent = fmtPct(stats.pctEngagement);
   document.getElementById('stat-eng-detail').textContent =
     `${stats.engagementBattus} sur ${stats.totalAvecEngagement} épreuves chronométrées`;
+
+  // Médailles (déjà calculé dans medalists)
+  const totalOr     = medalists.reduce((s, m) => s + m.or.length, 0);
+  const totalArgent = medalists.reduce((s, m) => s + m.argent.length, 0);
+  const totalBronze = medalists.reduce((s, m) => s + m.bronze.length, 0);
+  document.getElementById('stat-med-or').textContent     = totalOr || '0';
+  document.getElementById('stat-med-argent').textContent = totalArgent || '0';
+  document.getElementById('stat-med-bronze').textContent = totalBronze || '0';
+  document.getElementById('stat-med-detail').textContent =
+    `${new Set(medalists.map(m => m.label)).size} médaillé(s)`;
 
   // ── Meilleures épreuves ──────────────────────────────────
   const topEl = document.getElementById('results-top-epreuves');
@@ -1355,6 +1359,53 @@ function renderRapportFinal() {
     const moyPlacesGagnees = placesGagnees.length ? (placesGagnees.reduce((a,b)=>a+b,0)/placesGagnees.length).toFixed(1) : null;
     const nbPlacesGagnees = placesGagnees.reduce((a,b)=>a+b,0);
 
+    // Médailles
+    const medR = {};
+    const ensureMedR = (key, label, isRelay) => { if (!medR[key]) medR[key] = { label, isRelay, or: [], argent: [], bronze: [] }; };
+    allResults.filter(r => r.a_nage && r.rang && r.rang <= 3).forEach(r => {
+      const ath = r.events?.athletes; if (!ath) return;
+      const epr = `${r.events.epreuve}${r.events.tour && r.events.tour !== 'serie' ? ' ('+r.events.tour+')' : ''}`;
+      ensureMedR(r.events.athlete_id, `${ath.prenom} ${ath.nom}`, false);
+      if (r.rang === 1) medR[r.events.athlete_id].or.push(epr);
+      else if (r.rang === 2) medR[r.events.athlete_id].argent.push(epr);
+      else medR[r.events.athlete_id].bronze.push(epr);
+    });
+    allRelayResults.filter(rr => rr.rang && rr.rang <= 3).forEach(rr => {
+      const nom = rr.relay_events?.type_relais; if (!nom) return;
+      const key = 'relay_' + rr.relay_events.id;
+      const epr = `${nom}${rr.relay_events.tour ? ' ('+rr.relay_events.tour+')' : ''}`;
+      ensureMedR(key, nom, true);
+      if (rr.rang === 1) medR[key].or.push(epr);
+      else if (rr.rang === 2) medR[key].argent.push(epr);
+      else medR[key].bronze.push(epr);
+    });
+    const medalistesR = Object.values(medR).sort((a,b) => b.or.length - a.or.length || b.argent.length - a.argent.length || b.bronze.length - a.bronze.length);
+    const totOrR = medalistesR.reduce((s,m)=>s+m.or.length,0);
+    const totArgentR = medalistesR.reduce((s,m)=>s+m.argent.length,0);
+    const totBronzeR = medalistesR.reduce((s,m)=>s+m.bronze.length,0);
+    const medaillesHtml = medalistesR.length ? `
+      <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">
+          Tableau des médailles — 🥇 ${totOrR} · 🥈 ${totArgentR} · 🥉 ${totBronzeR}
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead><tr style="background:var(--surface2)">
+            <th style="padding:5px 8px;text-align:left;color:var(--muted);font-weight:600">Nageur / Relais</th>
+            <th style="padding:5px 8px;text-align:center">🥇</th>
+            <th style="padding:5px 8px;text-align:center">🥈</th>
+            <th style="padding:5px 8px;text-align:center">🥉</th>
+            <th style="padding:5px 8px;text-align:left;color:var(--muted);font-weight:600">Épreuve(s)</th>
+          </tr></thead>
+          <tbody>${medalistesR.map((m,i) => `<tr style="background:${i%2?'var(--surface2)':'var(--surface)'}">
+            <td style="padding:5px 8px;font-weight:600">${m.label}${m.isRelay ? ' <span style="font-size:9px;background:#EBF0F8;color:var(--blue);padding:1px 4px;border-radius:8px">RELAIS</span>' : ''}</td>
+            <td style="padding:5px 8px;text-align:center;font-size:13px">${m.or.length ? '🥇'.repeat(m.or.length) : '—'}</td>
+            <td style="padding:5px 8px;text-align:center;font-size:13px">${m.argent.length ? '🥈'.repeat(m.argent.length) : '—'}</td>
+            <td style="padding:5px 8px;text-align:center;font-size:13px">${m.bronze.length ? '🥉'.repeat(m.bronze.length) : '—'}</td>
+            <td style="padding:5px 8px;color:var(--muted)">${[...m.or,...m.argent,...m.bronze].join(', ')}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>` : '';
+
     // Forme entraîneurs — moyenne globale pour le rapport
     const formeByCoachR = {};
     allJournals.forEach(j => {
@@ -1458,6 +1509,7 @@ function renderRapportFinal() {
             <strong>${stats.engagementBattus}</strong> minima ${stats.engagementBattus > 1 ? 'ont été battus' : 'a été battu'} (<strong>${fmtPct(stats.pctEngagement)}</strong>).
             ${avecRanking.length ? `Sur <strong>${avecRanking.length}</strong> nageur(s) avec ranking initial, <strong>${placesGagnees.length}</strong> ont progressé dans le classement${moyPlacesGagnees ? ` (moy. +${moyPlacesGagnees} place${parseFloat(moyPlacesGagnees)>1?'s':''})` : ''}.` : ''}
           </div>
+          ${medaillesHtml}
           ` : `
           <!-- Format standard avec tours -->
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1rem">
@@ -1472,6 +1524,7 @@ function renderRapportFinal() {
             ${stats.nbPodium > 0 ? `<strong>${stats.nbPodium}</strong> podium(s) — ${fmtPct(stats.pctPodium)} des finalistes. ` : ''}
             ${stats.totalAvecEngagement > 0 ? `Minima battus : <strong>${stats.engagementBattus}</strong> sur <strong>${stats.totalAvecEngagement}</strong> épreuves (${fmtPct(stats.pctEngagement)}).` : ''}
           </div>
+          ${medaillesHtml}
           `}
         </div>
 
