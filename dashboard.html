@@ -492,7 +492,7 @@ async function loadAllData() {
     applyCoachFilter(sb.from('postcomp_staff_entries').select('*').eq('competition_id', activeCompId)),
     applyCoachFilter(sb.from('voyage_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
     applyCoachFilter(sb.from('precomp_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
-    sb.from('relay_events').select('*, coaches(prenom, nom), relay_athletes(athlete_id, athletes(sexe))').eq('competition_id', activeCompId),
+    sb.from('relay_events').select('*, coaches(prenom, nom)').eq('competition_id', activeCompId),
     sb.from('relay_results').select('*, relay_events(*), coaches(prenom, nom)').eq('relay_events.competition_id', activeCompId),
     sb.from('competition_coaches').select('coach_id, coaches(id, prenom, nom)').eq('competition_id', activeCompId),
   ]);
@@ -1123,14 +1123,11 @@ function renderMissingResults() {
     </tr>`;
   }).join('');
 
-  // Infer relay gender from relay_athletes → athletes.sexe
-  const inferSexe = re => {
-    const athletes = (re.relay_athletes || []).map(ra => ra.athletes?.sexe).filter(Boolean);
-    if (!athletes.length) return null;
-    const f = athletes.filter(s => s === 'F').length;
-    const m = athletes.filter(s => s === 'M').length;
-    if (f === m) return 'Mixte';
-    return f > m ? 'F' : 'M';
+  // Infer relay gender from type_relais name
+  const inferSexeFromName = nom => {
+    if (!nom) return null;
+    if (/mixte/i.test(nom)) return 'Mixte';
+    return null;
   };
   const sexeBadge = sexe => {
     if (!sexe) return '';
@@ -1141,7 +1138,7 @@ function renderMissingResults() {
 
   const relayRows = missingRelay.map(re => {
     const coachName = re.coaches ? re.coaches.prenom + ' ' + re.coaches.nom : '—';
-    const sexe = inferSexe(re);
+    const sexe = inferSexeFromName(re.type_relais);
     return `<tr id="missing-relay-row-${re.id}">
       <td style="font-size:12px;font-weight:600">${re.type_relais || '—'}${sexeBadge(sexe)}</td>
       <td style="font-size:11px;color:var(--muted)">${coachName}</td>
