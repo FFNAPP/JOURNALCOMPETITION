@@ -492,7 +492,7 @@ async function loadAllData() {
     applyCoachFilter(sb.from('postcomp_staff_entries').select('*').eq('competition_id', activeCompId)),
     applyCoachFilter(sb.from('voyage_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
     applyCoachFilter(sb.from('precomp_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
-    sb.from('relay_events').select('*, coaches(prenom, nom)').eq('competition_id', activeCompId),
+    sb.from('relay_events').select('*, coaches(prenom, nom), relay_athletes(athlete_id, athletes(sexe))').eq('competition_id', activeCompId),
     sb.from('relay_results').select('*, relay_events(*), coaches(prenom, nom)').eq('relay_events.competition_id', activeCompId),
     sb.from('competition_coaches').select('coach_id, coaches(id, prenom, nom)').eq('competition_id', activeCompId),
   ]);
@@ -1123,10 +1123,27 @@ function renderMissingResults() {
     </tr>`;
   }).join('');
 
+  // Infer relay gender from relay_athletes → athletes.sexe
+  const inferSexe = re => {
+    const athletes = (re.relay_athletes || []).map(ra => ra.athletes?.sexe).filter(Boolean);
+    if (!athletes.length) return null;
+    const f = athletes.filter(s => s === 'F').length;
+    const m = athletes.filter(s => s === 'M').length;
+    if (f === m) return 'Mixte';
+    return f > m ? 'F' : 'M';
+  };
+  const sexeBadge = sexe => {
+    if (!sexe) return '';
+    if (sexe === 'F') return '<span style="font-size:10px;background:#FDEEF5;color:#C2185B;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">♀ Filles</span>';
+    if (sexe === 'M') return '<span style="font-size:10px;background:#EBF3FB;color:#1565C0;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">♂ Garçons</span>';
+    return '<span style="font-size:10px;background:#F0F0F0;color:#555;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">Mixte</span>';
+  };
+
   const relayRows = missingRelay.map(re => {
     const coachName = re.coaches ? re.coaches.prenom + ' ' + re.coaches.nom : '—';
+    const sexe = inferSexe(re);
     return `<tr id="missing-relay-row-${re.id}">
-      <td style="font-size:12px;font-weight:600">${re.type_relais || '—'}</td>
+      <td style="font-size:12px;font-weight:600">${re.type_relais || '—'}${sexeBadge(sexe)}</td>
       <td style="font-size:11px;color:var(--muted)">${coachName}</td>
       <td style="font-size:11px;color:var(--muted)">${fmtDate(re.date_epreuve)}</td>
       <td><input type="text" id="mr-rtps-${re.id}" placeholder="3:45.67" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-family:'DM Mono',monospace;font-size:12px"></td>
@@ -1198,11 +1215,14 @@ async function saveMissingRelayResult(relayEventId) {
   const btn = document.querySelector(`#missing-relay-row-${relayEventId} button`);
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
 
-  const { error } = await sb.from('relay_results').upsert({
-    relay_event_id: relayEventId,
-    temps_final:    temps,
-    rang:           rang,
-  }, { onConflict: 'relay_event_id' });
+  // Check if a result already exists (no unique constraint → can't upsert)
+  const { data: existing } = await sb.from('relay_results').select('id').eq('relay_event_id', relayEventId).maybeSingle();
+  let error;
+  if (existing) {
+    ({ error } = await sb.from('relay_results').update({ temps_final: temps, rang }).eq('id', existing.id));
+  } else {
+    ({ error } = await sb.from('relay_results').insert({ relay_event_id: relayEventId, temps_final: temps, rang }));
+  }
 
   if (error) {
     alert('Erreur : ' + error.message);
