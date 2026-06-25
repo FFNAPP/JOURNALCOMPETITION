@@ -628,11 +628,18 @@ function fmtDelta(rankingInitial, rangFinal) {
   return `<span style="color:${color};font-size:11px;font-weight:600">${sign}${delta}</span>`;
 }
 
-// Compare deux temps au format "1:02.34" ou "58.42" ou "1:02:34.56"
+// Compare deux temps au format "1:02.34", "58.42", "4.07.48" (points comme séparateurs) ou "1:02:34.56"
 function compareTemps(a, b) {
   const toSeconds = s => {
     if (!s) return Infinity;
-    const parts = s.split(':').map(parseFloat);
+    // Normalise "4.07.48" → "4:07.48" : si 2+ points sans deux-points, on remplace les points sauf le dernier par des deux-points
+    let t = s.trim();
+    const dots = (t.match(/\./g) || []).length;
+    if (!t.includes(':') && dots >= 2) {
+      const parts = t.split('.');
+      t = parts.slice(0, -1).join(':') + '.' + parts[parts.length - 1];
+    }
+    const parts = t.split(':').map(parseFloat);
     if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
     if (parts.length === 2) return parts[0]*60 + parts[1];
     return parts[0];
