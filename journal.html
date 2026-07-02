@@ -532,10 +532,12 @@
         <div class="section-chevron open">▾</div>
       </div>
       <div class="section-body">
+        <div style="overflow-x:auto">
         <table class="result-table">
-          <thead><tr><th style="width:18%">Nageur·se</th><th style="width:20%">Épreuve</th><th style="width:10%">Tour</th><th style="width:12%">A nagé ?</th><th style="width:10%">Temps</th><th style="width:6%">Rang</th><th style="width:10%">Rang init. → Δ</th><th>Observations</th></tr></thead>
+          <thead><tr><th style="width:18%">Nageur·se</th><th style="width:20%">Épreuve</th><th style="width:10%">Tour</th><th style="width:12%">A nagé ?</th><th style="width:10%">Temps</th><th style="width:6%">Rang</th><th style="width:14%">Rang init. → Δ</th></tr></thead>
           <tbody id="results-tbody"></tbody>
         </table>
+        </div>
         <div style="font-size:12px;color:var(--hint)">Le programme est pré-rempli depuis les épreuves du jour.</div>
 
         <!-- SECTION RELAIS -->
@@ -1705,7 +1707,7 @@ function fillPostcompForm(d) {
 function renderResultsTable() {
   const tbody = document.getElementById('results-tbody');
   if (!currentEvents.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:1rem;color:var(--hint);font-size:13px">Aucune épreuve prévue ce jour</td></tr>'; return;
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--hint);font-size:13px">Aucune épreuve prévue ce jour</td></tr>'; return;
   }
   tbody.innerHTML = currentEvents.map(ev => {
     const rs = resultStates[ev.id] || {};
@@ -1736,7 +1738,13 @@ function renderResultsTable() {
       <td><input type="text" value="${rs.temps||''}" placeholder="58.42" style="width:70px" oninput="setResult('${ev.id}','temps',this.value)"></td>
       <td><input type="text" value="${rs.rang||''}"  placeholder="4"     style="width:45px" oninput="setResult('${ev.id}','rang',this.value)"></td>
       <td style="text-align:center;line-height:1.4">${deltaHtml}</td>
-      <td><input type="text" value="${rs.observations||''}" placeholder="Observations…" oninput="setResult('${ev.id}','observations',this.value)"></td>
+    </tr>
+    <tr style="background:var(--surface2)">
+      <td colspan="7" style="padding:4px 8px 10px">
+        <textarea id="obs-${ev.id}" style="width:100%;min-height:52px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;resize:vertical;background:var(--surface);color:var(--text);font-family:inherit"
+          placeholder="Gestion de l'avant course, gestion de la course, communication avec le nageur, points techniques observés…"
+          oninput="setResult('${ev.id}','observations',this.value)">${rs.observations||''}</textarea>
+      </td>
     </tr>`;
   }).join('');
 }
