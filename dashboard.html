@@ -2042,6 +2042,8 @@ function renderStaffComp() {
   const logK = ['log_trajet','log_navette','log_hebergement','log_restauration','log_meteo'];
   const sptK = ['sport_comen','sport_medailles','sport_mpp','sport_fluidite_csp'];
   const vieK = ['vie_attitude','vie_cohesion','vie_consignes','vie_valeurs','vie_temps_libre','vie_recuperation','vie_suivi_medical'];
+  const formePhys = e => e.forme_physique_responsable;
+  const formePsycho = e => e.forme_psychologique_responsable;
   const avg = (entries, keys) => { const v=entries.flatMap(e=>keys.map(k=>e[k]).filter(x=>x!=null)); return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):'—'; };
   const nbMedecin = allStaffEntries.filter(e => e.vie_medecin).length;
   const chartData = allStaffEntries.map(e => ({ date:e.date_entree, log:avg([e],logK), sport:avg([e],sptK), vie:avg([e],vieK) }));
@@ -2057,12 +2059,14 @@ function renderStaffComp() {
       ${renderStaffChart(chartData)}
     </div>
     <table class="data-table">
-      <thead><tr><th>Date</th><th>Logistique</th><th>Sportif</th><th>Vie de groupe</th><th>Médecin</th><th>Observations</th></tr></thead>
+      <thead><tr><th>Date</th><th>Logistique</th><th>Sportif</th><th>Vie de groupe</th><th>Forme phys.</th><th>Forme psy.</th><th>Médecin</th><th>Observations</th></tr></thead>
       <tbody>${allStaffEntries.map(e => `<tr>
         <td style="font-family:'DM Mono',monospace;white-space:nowrap">${fmtDate(e.date_entree)}</td>
         <td><div style="display:flex;align-items:center;gap:6px">${scorePips(Math.round(parseFloat(avg([e],logK))))}<span style="font-size:11px;color:var(--muted)">${avg([e],logK)}</span></div></td>
         <td><div style="display:flex;align-items:center;gap:6px">${scorePips(Math.round(parseFloat(avg([e],sptK))))}<span style="font-size:11px;color:var(--muted)">${avg([e],sptK)}</span></div></td>
         <td><div style="display:flex;align-items:center;gap:6px">${scorePips(Math.round(parseFloat(avg([e],vieK))))}<span style="font-size:11px;color:var(--muted)">${avg([e],vieK)}</span></div></td>
+        <td>${formePhys(e)?scorePips(formePhys(e))+'<span style="font-size:11px;color:var(--muted);margin-left:4px">'+formePhys(e)+'/5</span>':'<span style="color:var(--hint)">—</span>'}</td>
+        <td>${formePsycho(e)?scorePips(formePsycho(e))+'<span style="font-size:11px;color:var(--muted);margin-left:4px">'+formePsycho(e)+'/5</span>':'<span style="color:var(--hint)">—</span>'}</td>
         <td>${e.vie_medecin?'<span class="badge badge-orange">Oui</span>':'<span class="badge badge-gray">Non</span>'}</td>
         <td style="font-size:11px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.observations_generales||'—'}</td>
       </tr>`).join('')}</tbody>
@@ -2106,9 +2110,11 @@ function renderStaffPrecomp() {
         <span class="badge badge-blue">Checklist ${done}/8</span>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-        ${e.groupe_forme_generale?`<span class="badge badge-gray">Forme ${e.groupe_forme_generale}/5</span>`:''}
+        ${e.groupe_forme_generale?`<span class="badge badge-gray">Groupe — Forme ${e.groupe_forme_generale}/5</span>`:''}
         ${e.groupe_motivation?`<span class="badge badge-orange">Motivation ${e.groupe_motivation}/5</span>`:''}
         ${e.groupe_cohesion?`<span class="badge badge-green">Cohésion ${e.groupe_cohesion}/5</span>`:''}
+        ${e.forme_physique_responsable?`<span class="badge badge-blue">Responsable — Phys. ${e.forme_physique_responsable}/5</span>`:''}
+        ${e.forme_psychologique_responsable?`<span class="badge badge-blue">Psy. ${e.forme_psychologique_responsable}/5</span>`:''}
       </div>
       <div style="background:var(--border);border-radius:3px;height:6px;margin-bottom:8px"><div style="width:${done/8*100}%;height:100%;background:var(--teal);border-radius:3px"></div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:12px">

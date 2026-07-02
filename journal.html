@@ -496,6 +496,34 @@
       </div>
     </div>
 
+    <div class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <div class="section-num teal">D</div>
+        <div class="section-title">Mon état de forme</div>
+        <div class="section-chevron open">▾</div>
+      </div>
+      <div class="section-body">
+        <div>
+          <label>Forme physique</label>
+          <div class="staff-slider-row">
+            <span class="staff-slider-min">Épuisé</span>
+            <div class="slider-wrap"><input type="range" class="teal-thumb" id="ps-forme-physique" min="1" max="5" value="3" oninput="updateStaffSlider(this,'ps-forme-physique-val','var(--teal)')"></div>
+            <span class="slider-val" id="ps-forme-physique-val">3</span>
+            <span class="staff-slider-max">En pleine forme</span>
+          </div>
+        </div>
+        <div>
+          <label>Forme psychologique</label>
+          <div class="staff-slider-row">
+            <span class="staff-slider-min">Épuisé</span>
+            <div class="slider-wrap"><input type="range" class="teal-thumb" id="ps-forme-psychologique" min="1" max="5" value="3" oninput="updateStaffSlider(this,'ps-forme-psychologique-val','var(--teal)')"></div>
+            <span class="slider-val" id="ps-forme-psychologique-val">3</span>
+            <span class="staff-slider-max">En pleine forme</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /zone-precomp-staff -->
 
   <!-- ════════ ZONE COMPÉTITION — ENTRAÎNEUR ════════ -->
@@ -1186,7 +1214,8 @@ const STAFF_ITEMS = {
     { key:'log_meteo',        label:'Conditions météo',  min:'Très mauvaises', max:'Idéales' },
   ],
   vie: [
-    { key:'vie_forme_responsable', label:'État de forme du responsable d\'équipe', min:'Épuisé', max:'En pleine forme' },
+    { key:'forme_physique_responsable',      label:'Forme physique du responsable',      min:'Épuisé',    max:'En pleine forme' },
+    { key:'forme_psychologique_responsable', label:'Forme psychologique du responsable',  min:'Épuisé',    max:'En pleine forme' },
     { key:'vie_attitude',      label:'Attitude entre les épreuves',               min:'Insuffisante', max:'Exemplaire' },
     { key:'vie_cohesion',      label:'Cohésion de groupe',                         min:'Faible',       max:'Très forte' },
     { key:'vie_consignes',     label:'Respect des consignes',                      min:'Non respecté', max:'Exemplaire' },
@@ -2202,6 +2231,10 @@ function fillPrecompStaffForm(d) {
    ['log-observations','log_observations'],['ps-objectifs-groupe','objectifs_groupe'],['ps-scenarios-anticipes','scenarios_anticipes'],['ps-plans-contingence','plans_contingence'],
    ['ps-composition-staff','composition_staff'],['ps-roles-responsabilites','roles_responsabilites'],['ps-points-attention-staff','points_attention_staff'],['ps-observations-generales','observations_generales']
   ].forEach(([hid, dbk]) => { const el = document.getElementById(hid); if (el) el.value = d?.[dbk] || ''; });
+  [['ps-forme-physique','forme_physique_responsable'],['ps-forme-psychologique','forme_psychologique_responsable']].forEach(([hid, dbk]) => {
+    const sl = document.getElementById(hid); if (!sl) return;
+    sl.value = d?.[dbk] || 3; updateStaffSlider(sl, hid+'-val', 'var(--teal)');
+  });
   updateSaveStatus(d?.updated_at);
 }
 
@@ -2221,6 +2254,8 @@ async function savePrecompStaff() {
     plans_contingence: g('ps-plans-contingence'), composition_staff: g('ps-composition-staff'),
     roles_responsabilites: g('ps-roles-responsabilites'), points_attention_staff: g('ps-points-attention-staff'),
     observations_generales: g('ps-observations-generales'),
+    forme_physique_responsable: gi('ps-forme-physique'),
+    forme_psychologique_responsable: gi('ps-forme-psychologique'),
   };
   let error;
   if (existingPrecompStaffId) { ({error} = await sb.from('precomp_staff_entries').update(payload).eq('id', existingPrecompStaffId)); }
