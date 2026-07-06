@@ -1497,10 +1497,12 @@ async function loadRelays() {
   if (!tbody) return;
   if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">Aucun relais</td></tr>'; return; }
   const sexeBadge = s => s ? `<span class="badge ${s==='mixte'?'badge-orange':s==='femmes'?'badge-pink':'badge-blue'}" style="margin-left:4px;font-size:10px">${s}</span>` : '';
+  // Store relay data in cache for edit access
+  window._relayCache = {};
   tbody.innerHTML = data.map(r => {
     const sorted = (r.relay_athletes || []).slice().sort((a,b) => a.position - b.position);
     const nageurs = sorted.map(a => `${a.athletes.prenom} ${a.athletes.nom}`).join(', ');
-    const rJson = encodeURIComponent(JSON.stringify({ id:r.id, type_relais:r.type_relais, sexe:r.sexe, tour:r.tour, date_epreuve:r.date_epreuve, heure:r.heure, temps_engagement:r.temps_engagement, coach_id:r.coach_id, relay_athletes: sorted.map(ra=>({position:ra.position,athlete_id:ra.athletes?.id||ra.athlete_id})) }));
+    window._relayCache[r.id] = { id:r.id, type_relais:r.type_relais, sexe:r.sexe, tour:r.tour, date_epreuve:r.date_epreuve, heure:r.heure, temps_engagement:r.temps_engagement, coach_id:r.coach_id, relay_athletes: sorted.map(ra=>({position:ra.position,athlete_id:ra.athletes?.id||ra.athlete_id})) };
     return `<tr>
       <td>${r.type_relais}${sexeBadge(r.sexe)}</td>
       <td>${badgeTour(r.tour)}</td>
@@ -1509,7 +1511,7 @@ async function loadRelays() {
       <td style="font-size:12px;color:var(--muted)">${nageurs || '—'}</td>
       <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${r.temps_engagement || '—'}</td>
       <td style="display:flex;gap:4px">
-        <button class="btn btn-sm" onclick="openRelayModal(JSON.parse(decodeURIComponent('${rJson}')))">✏️</button>
+        <button class="btn btn-sm" onclick="openRelayModal(window._relayCache['${r.id}'])">✏️</button>
         <button class="btn btn-sm btn-danger" onclick="deleteRelay('${r.id}')">✕</button>
       </td>
     </tr>`;
