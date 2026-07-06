@@ -1510,9 +1510,8 @@ async function loadRelays() {
       <td style="font-size:12px">${r.coaches ? r.coaches.prenom+' '+r.coaches.nom : '—'}</td>
       <td style="font-size:12px;color:var(--muted)">${nageurs || '—'}</td>
       <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${r.temps_engagement || '—'}</td>
-      <td style="display:flex;gap:4px">
-        <button class="btn btn-sm" onclick="openRelayModal(window._relayCache['${r.id}'])">✏️</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteRelay('${r.id}')">✕</button>
+      <td>
+        <button class="btn btn-sm" style="margin-right:4px" onclick="openRelayModal(window._relayCache['${r.id}'])">✏️</button><button class="btn btn-sm btn-danger" onclick="deleteRelay('${r.id}')">✕</button>
       </td>
     </tr>`;
   }).join('');
