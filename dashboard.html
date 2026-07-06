@@ -492,7 +492,7 @@ async function loadAllData() {
     applyCoachFilter(sb.from('postcomp_staff_entries').select('*').eq('competition_id', activeCompId)),
     applyCoachFilter(sb.from('voyage_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
     applyCoachFilter(sb.from('precomp_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
-    sb.from('relay_events').select('*, coaches(prenom, nom)').eq('competition_id', activeCompId),
+    sb.from('relay_events').select('*, coaches(prenom, nom), relay_athletes(position, athlete_id)').eq('competition_id', activeCompId),
     sb.from('relay_results').select('*, relay_events(*), coaches(prenom, nom)').eq('relay_events.competition_id', activeCompId),
     sb.from('competition_coaches').select('coach_id, coaches(id, prenom, nom)').eq('competition_id', activeCompId),
   ]);
@@ -1145,7 +1145,7 @@ function renderMissingResults() {
 
   const relayRows = missingRelay.map(re => {
     const coachName = re.coaches ? re.coaches.prenom + ' ' + re.coaches.nom : '—';
-    const sexe = inferSexeFromName(re.type_relais);
+    const sexe = re.sexe || inferSexeFromName(re.type_relais);
     return `<tr id="missing-relay-row-${re.id}">
       <td style="font-size:12px;font-weight:600">${re.type_relais || '—'}${sexeBadge(sexe)}</td>
       <td style="font-size:11px;color:var(--muted)">${coachName}</td>
@@ -1219,13 +1219,16 @@ async function saveMissingRelayResult(relayEventId) {
   const btn = document.querySelector(`#missing-relay-row-${relayEventId} button`);
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
 
+  const re = allRelayEvents.find(r => String(r.id) === String(relayEventId));
+  const coachId = re?.coach_id || _dashCoachId || null;
+
   // Check if a result already exists (no unique constraint → can't upsert)
   const { data: existing } = await sb.from('relay_results').select('id').eq('relay_event_id', relayEventId).maybeSingle();
   let error;
   if (existing) {
     ({ error } = await sb.from('relay_results').update({ temps_final: temps, rang }).eq('id', existing.id));
   } else {
-    ({ error } = await sb.from('relay_results').insert({ relay_event_id: relayEventId, temps_final: temps, rang }));
+    ({ error } = await sb.from('relay_results').insert({ relay_event_id: relayEventId, temps_final: temps, rang, coach_id: coachId }));
   }
 
   if (error) {

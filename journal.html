@@ -1597,6 +1597,10 @@ async function loadDayData(date) {
       .maybeSingle();
     existingVoyageId = data?.id || null;
     fillVoyageForm(data);
+    if (!data) {
+      const autoType = date === activeComp?.date_voyage_retour ? 'retour' : 'aller';
+      document.querySelectorAll('input[name="voyage-type"]').forEach(r => { r.checked = r.value === autoType; });
+    }
   }
   if (phases.includes('precomp')) {
     if (activeRole === 'staff_responsable') {
@@ -1856,9 +1860,16 @@ async function saveRelayResult(relayEventId, athletes) {
   const tempsFinal = (document.getElementById('relay-temps-final-'+relayEventId)?.value || '').trim() || null;
   const rang       = parseInt(document.getElementById('relay-rang-'+relayEventId)?.value) || null;
 
-  const { data: result, error: e1 } = await sb.from('relay_results')
-    .upsert({ relay_event_id: relayEventId, coach_id: activeCoachId, temps_final: tempsFinal, rang }, { onConflict: 'relay_event_id,coach_id' })
-    .select().single();
+  const { data: existing } = await sb.from('relay_results').select('id').eq('relay_event_id', relayEventId).maybeSingle();
+  let result, e1;
+  if (existing) {
+    ({ error: e1 } = await sb.from('relay_results').update({ temps_final: tempsFinal, rang }).eq('id', existing.id));
+    result = existing;
+  } else {
+    ({ data: result, error: e1 } = await sb.from('relay_results')
+      .insert({ relay_event_id: relayEventId, coach_id: activeCoachId, temps_final: tempsFinal, rang })
+      .select().single());
+  }
   if (e1) { toast('Erreur : ' + e1.message, 'error'); return; }
 
   const splitsPayload = athletes.map(a => ({
