@@ -1195,6 +1195,18 @@ window.addEventListener('unhandledrejection', e => showFatalError('Promesse reje
 // ── ÉTAT GLOBAL ────────────────────────────────────────────
 let activeCompId = null, activeCoachId = null, activeComp = null;
 let activeRole = 'entraineur'; // 'entraineur' | 'staff_responsable'
+
+function normalizeTemps(s) {
+  if (!s) return s;
+  let t = s.trim();
+  t = t.replace(/(\d+)'(\d+)[''"](\d+)/, '$1:$2.$3');
+  t = t.replace(/^(\d+)[''"](\d+)$/, '$1.$2');
+  const dots = (t.match(/\./g) || []).length;
+  if (!t.includes(':') && dots >= 2) { const p = t.split('.'); t = p.slice(0,-1).join(':') + '.' + p[p.length-1]; }
+  t = t.replace(/^(\d+):(\d+):(\d+)$/, '$1:$2.$3');
+  t = t.replace(/^0+:(\d+\.\d+)$/, '$1');
+  return t;
+}
 let currentDate = new Date().toISOString().split('T')[0];
 let currentPhase = null; // 'precomp' | 'comp' | 'postcomp' | null
 let currentPhases = []; // toutes les phases actives du jour
@@ -1858,7 +1870,7 @@ async function loadRelaySection() {
 }
 
 async function saveRelayResult(relayEventId, athletes) {
-  const tempsFinal = (document.getElementById('relay-temps-final-'+relayEventId)?.value || '').trim() || null;
+  const tempsFinal = normalizeTemps((document.getElementById('relay-temps-final-'+relayEventId)?.value || '').trim()) || null;
   const rang       = parseInt(document.getElementById('relay-rang-'+relayEventId)?.value) || null;
 
   const { data: existing } = await sb.from('relay_results').select('id').eq('relay_event_id', relayEventId).maybeSingle();
@@ -2129,7 +2141,7 @@ async function saveComp() {
   if (error) return toast('Erreur journal : '+error.message, 'error');
   for (const ev of currentEvents) {
     const rs = resultStates[ev.id]; if (!rs) continue;
-    const p = { competition_id: activeCompId, event_id: ev.id, coach_id: activeCoachId, a_nage: rs.a_nage !== undefined ? rs.a_nage : true, temps: rs.temps||null, rang: rs.rang ? parseInt(rs.rang) : null, observations: rs.observations||null };
+    const p = { competition_id: activeCompId, event_id: ev.id, coach_id: activeCoachId, a_nage: rs.a_nage !== undefined ? rs.a_nage : true, temps: normalizeTemps(rs.temps)||null, rang: rs.rang ? parseInt(rs.rang) : null, observations: rs.observations||null };
     if (rs.id) { await sb.from('results').update(p).eq('id', rs.id); }
     else { const {data} = await sb.from('results').insert(p).select().single(); if(data) resultStates[ev.id].id=data.id; }
   }
