@@ -1145,9 +1145,9 @@ function renderResultats() {
         <td>${fmtDelta(r.events?.ranking_initial, r.rang)}</td>
         <td style="font-size:11px;color:var(--muted)">${r.coaches?.prenom} ${r.coaches?.nom}</td>
         <td style="font-size:11px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.observations || '—'}</td>
-        <td style="white-space:nowrap">
+        <td style="white-space:nowrap;min-width:36px">
           <button id="result-edit-btn-${rid}" onclick="toggleResultEditCached('${rid}')"
-            style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--muted)">✏️</button>
+            style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--muted);display:inline-flex;align-items:center">✏️</button>
         </td>
       </tr>`;
     }).join('');
