@@ -797,18 +797,21 @@ function renderSynthese() {
   if (!allCompCoaches.length) { compEl.innerHTML = '<div class="empty">Aucun entraîneur affecté</div>'; return; }
 
   // Calculer le nombre de jours de compétition attendus
-  const compDays = (() => {
-    if (!activeComp?.date_debut || !activeComp?.date_fin) return 0;
-    let d = new Date(activeComp.date_debut), end = new Date(activeComp.date_fin), n = 0;
-    while (d <= end) { n++; d.setDate(d.getDate() + 1); }
+  const countDays = (start, end) => {
+    if (!start) return 0;
+    let d = new Date(start), e = new Date(end || start), n = 0;
+    while (d <= e) { n++; d.setDate(d.getDate() + 1); }
     return n;
-  })();
+  };
+  const compDays  = countDays(activeComp?.date_debut, activeComp?.date_fin);
+  const stageDays = countDays(activeComp?.date_stage_debut, activeComp?.date_stage_fin);
 
   const chk = (ok) => ok
     ? '<span style="color:var(--success);font-size:14px;font-weight:700">✓</span>'
     : '<span style="color:var(--border);font-size:14px">—</span>';
   const pct = (n, t) => t === 0 ? '<span style="color:var(--hint)">—</span>'
     : `<span style="font-weight:600;color:${n===t?'var(--success)':n>0?'var(--accent2)':'var(--error)'}">${n}/${t}</span>`;
+  const chkOrPct = (n, t) => t <= 1 ? chk(n >= 1) : pct(n, t);
 
   const hasVoyAller  = !!activeComp?.date_voyage_aller;
   const hasVoyRetour = !!activeComp?.date_voyage_retour;
@@ -816,9 +819,9 @@ function renderSynthese() {
   const rows = allCompCoaches.map(coach => {
     const cid = coach.id;
     const isStaff = coach.role === 'staff_responsable';
-    const hasPrecomp  = isStaff
-      ? allPrecompStaff.some(p => p.coach_id === cid)
-      : allPrecompEntries.some(p => p.coach_id === cid);
+    const precompDays = isStaff
+      ? new Set(allPrecompStaff.filter(p => p.coach_id === cid).map(p => p.date_entree)).size
+      : new Set(allPrecompEntries.filter(p => p.coach_id === cid).map(p => p.date_entree)).size;
     const hasPostcomp = isStaff
       ? allPostcompStaff.some(p => p.coach_id === cid)
       : allPostcompEntries.some(p => p.coach_id === cid);
@@ -827,13 +830,14 @@ function renderSynthese() {
       : new Set(allJournals.filter(j => j.coach_id === cid).map(j => j.date_entree)).size;
     const voyAller  = allVoyageEntries.some(v => v.coach_id === cid && v.type_journee === 'aller');
     const voyRetour = allVoyageEntries.some(v => v.coach_id === cid && v.type_journee === 'retour');
-    const total = (hasPrecomp?1:0) + journalDays + (hasPostcomp?1:0) + (hasVoyAller&&voyAller?1:0) + (hasVoyRetour&&voyRetour?1:0);
-    const max = 1 + compDays + 1 + (hasVoyAller?1:0) + (hasVoyRetour?1:0);
+    const precompMax = stageDays || 1;
+    const total = Math.min(precompDays, precompMax) + journalDays + (hasPostcomp?1:0) + (hasVoyAller&&voyAller?1:0) + (hasVoyRetour&&voyRetour?1:0);
+    const max = precompMax + compDays + 1 + (hasVoyAller?1:0) + (hasVoyRetour?1:0);
     const fillPct = max > 0 ? Math.round(total / max * 100) : 0;
     const fillColor = fillPct >= 80 ? 'var(--success)' : fillPct >= 40 ? 'var(--accent2)' : 'var(--error)';
     return `<tr>
       <td style="font-weight:500">${coach.prenom} ${coach.nom}</td>
-      <td style="text-align:center">${chk(hasPrecomp)}</td>
+      <td style="text-align:center">${chkOrPct(precompDays, precompMax)}</td>
       <td style="text-align:center">${pct(journalDays, compDays)}</td>
       <td style="text-align:center">${chk(hasPostcomp)}</td>
       ${hasVoyAller  ? `<td style="text-align:center">${chk(voyAller)}</td>` : ''}
