@@ -1298,28 +1298,28 @@ function detectPhase(dateStr, comp) {
   const d = dateStr; // string 'YYYY-MM-DD'
   const phases = [];
 
-  // Compétition (priorité la plus haute)
-  if (comp.date_debut && comp.date_fin && d >= comp.date_debut && d <= comp.date_fin)
-    phases.push('comp');
-
-  // Bilan
-  if (comp.date_bilan && d === comp.date_bilan)
-    phases.push('postcomp');
-
-  // Voyage aller
+  // Voyage aller/retour — priorité absolue sur toute autre phase
   if (comp.date_voyage_aller && d === comp.date_voyage_aller)
     phases.push('voyage');
-  // Voyage retour (même jour que bilan possible, mais bilan a priorité)
   else if (comp.date_voyage_retour && d === comp.date_voyage_retour)
     phases.push('voyage');
 
+  // Bilan
+  if (comp.date_bilan && d === comp.date_bilan && !phases.includes('voyage'))
+    phases.push('postcomp');
+
+  // Compétition
+  if (comp.date_debut && comp.date_fin && d >= comp.date_debut && d <= comp.date_fin && !phases.includes('voyage'))
+    phases.push('comp');
+
   // Stage
-  if (comp.date_stage_debut && comp.date_stage_fin &&
-      d >= comp.date_stage_debut && d <= comp.date_stage_fin)
-    phases.push('stage');
-  // Stage sans date de fin (date unique)
-  else if (comp.date_stage_debut && !comp.date_stage_fin && d === comp.date_stage_debut)
-    phases.push('stage');
+  if (!phases.includes('voyage')) {
+    if (comp.date_stage_debut && comp.date_stage_fin &&
+        d >= comp.date_stage_debut && d <= comp.date_stage_fin)
+      phases.push('stage');
+    else if (comp.date_stage_debut && !comp.date_stage_fin && d === comp.date_stage_debut)
+      phases.push('stage');
+  }
 
   return phases;
 }
