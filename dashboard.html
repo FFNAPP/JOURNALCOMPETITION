@@ -1047,7 +1047,7 @@ function renderResultats() {
             <td><span class="badge badge-green">✓ Nagé</span></td>
             <td id="rr-temps-${rr.id}" style="font-family:'DM Mono',monospace;font-weight:500"><span style="${tempsStyle}">${rr.temps_final || '—'}</span></td>
             <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${ref || '—'}</td>
-            <td>—</td>
+            <td style="font-family:'DM Mono',monospace;font-size:11px;font-weight:600;${tempsCmp===null?'color:var(--hint)':tempsCmp<0?'color:#155724':tempsCmp>0?'color:#922b21':'color:var(--muted)'}">${(()=>{if(tempsCmp===null||!ref||!rr.temps_final)return'—';const rs=ref.split(':').map(parseFloat).reduce((a,b,i,arr)=>i===arr.length-1?a+b:a*60+b,0);const ns=rr.temps_final.split(':').map(parseFloat).reduce((a,b,i,arr)=>i===arr.length-1?a+b:a*60+b,0);const p=((rs-ns)/rs*100);return(p>=0?'+':'')+p.toFixed(2)+'%';})()}</td>
             <td id="rr-rang-${rr.id}">${rr.rang ? `<span class="badge ${podium ? 'badge-green' : rr.rang <= 8 ? 'badge-orange' : 'badge-gray'}">${podium ? '🏅 ' : ''}${rr.rang}</span>` : '—'}</td>
             <td>—</td>
             <td style="font-size:11px;color:var(--muted)">${rr.coaches?.prenom || ''} ${rr.coaches?.nom || ''}</td>
@@ -1075,6 +1075,7 @@ function renderResultats() {
             <span style="${tempsStyle}">${tempsR || '—'}</span>
           </td>
           <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${ref || '—'}</td>
+          <td style="font-family:'DM Mono',monospace;font-size:11px;font-weight:600;${tempsCmp===null?'color:var(--hint)':tempsCmp<0?'color:#155724':tempsCmp>0?'color:#922b21':'color:var(--muted)'}">${(()=>{if(tempsCmp===null||!ref||!tempsR)return'—';const rs=ref.split(':').map(parseFloat).reduce((a,b,i,arr)=>i===arr.length-1?a+b:a*60+b,0);const ns=tempsR.split(':').map(parseFloat).reduce((a,b,i,arr)=>i===arr.length-1?a+b:a*60+b,0);const p=((rs-ns)/rs*100);return(p>=0?'+':'')+p.toFixed(2)+'%';})()}</td>
           <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.ranking_initial != null ? '#'+r.events.ranking_initial : '—'}</td>
           <td>${r.rang ? `<span class="badge ${podium ? 'badge-green' : r.rang <= 8 ? 'badge-orange' : 'badge-gray'}">${podium ? '🏅 ' : ''}${r.rang}</span>` : '—'}</td>
           <td>${fmtDelta(r.events?.ranking_initial, r.rang)}</td>
@@ -1095,7 +1096,7 @@ function renderResultats() {
             ${rows.filter(r=>(r._isRelay?r.rr.rang:r.rang)&&(r._isRelay?r.rr.rang:r.rang)<=3).length ? `<span class="badge badge-green">🏅 ${rows.filter(r=>(r._isRelay?r.rr.rang:r.rang)&&(r._isRelay?r.rr.rang:r.rang)<=3).length} podium(s)</span>` : ''}
           </div>
           <table class="data-table">
-            <thead><tr><th>Nageur</th><th>Tour</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Réf.</th><th>Rang init.</th><th>Rang final</th><th>Δ</th><th>Entraîneur</th><th>Observations</th></tr></thead>
+            <thead><tr><th>Nageur</th><th>Tour</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Réf.</th><th>% vs réf.</th><th>Rang init.</th><th>Rang final</th><th>Δ</th><th>Entraîneur</th><th>Observations</th></tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
         </div>`;

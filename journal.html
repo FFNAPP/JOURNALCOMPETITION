@@ -1214,8 +1214,8 @@ const STAFF_ITEMS = {
     { key:'log_meteo',        label:'Conditions météo',  min:'Très mauvaises', max:'Idéales' },
   ],
   vie: [
-    { key:'forme_physique_responsable',      label:'Forme physique du responsable',      min:'Épuisé',    max:'En pleine forme' },
-    { key:'forme_psychologique_responsable', label:'Forme psychologique du responsable',  min:'Épuisé',    max:'En pleine forme' },
+    { key:'forme_physique_responsable',      label:'Forme physique du responsable',      min:'Épuisé',    max:'En pleine forme', noObs:true },
+    { key:'forme_psychologique_responsable', label:'Forme psychologique du responsable',  min:'Épuisé',    max:'En pleine forme', noObs:true },
     { key:'vie_attitude',      label:'Attitude entre les épreuves',               min:'Insuffisante', max:'Exemplaire' },
     { key:'vie_cohesion',      label:'Cohésion de groupe',                         min:'Faible',       max:'Très forte' },
     { key:'vie_consignes',     label:'Respect des consignes',                      min:'Non respecté', max:'Exemplaire' },
@@ -2144,7 +2144,7 @@ async function saveStaff() {
   };
   allItems.forEach(item => {
     const sl = document.getElementById(item.key); if (sl) payload[item.key] = parseInt(sl.value);
-    const obs = document.getElementById(item.key+'_obs'); if (obs) payload[item.key+'_obs'] = obs.value;
+    if (!item.noObs) { const obs = document.getElementById(item.key+'_obs'); if (obs) payload[item.key+'_obs'] = obs.value; }
   });
   let error;
   if (existingStaffId) { ({error} = await sb.from('staff_entries').update(payload).eq('id', existingStaffId)); }
