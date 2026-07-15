@@ -767,31 +767,37 @@ function renderResultats() {
 
   // ── Tableau des médailles ────────────────────────────────
   const medalsCard = document.getElementById('medals-card');
-  const comp = allEvents.length ? allEvents[0]?.competitions : null;
   const compType = activeComp?.type_competition || '';
   const isSerieTourR = ['COMEN','CEJ_EL'].includes(compType);
   const medalsByAthlete = {};
-  const ensureMedal = (key, label, isRelay) => {
-    if (!medalsByAthlete[key]) medalsByAthlete[key] = { label, isRelay, or: [], argent: [], bronze: [] };
+  const normSexe = s => {
+    if (!s) return 'inconnu';
+    const v = s.toLowerCase();
+    if (v === 'f' || v === 'femmes') return 'F';
+    if (v === 'm' || v === 'hommes') return 'M';
+    if (v === 'mixte') return 'Mixte';
+    return 'inconnu';
   };
-  // Résultats individuels : finale seulement, ou rang 1-3 pour classements au temps
+  const ensureMedal = (key, label, isRelay, sexe) => {
+    if (!medalsByAthlete[key]) medalsByAthlete[key] = { label, isRelay, sexe, or: [], argent: [], bronze: [] };
+  };
+  // Résultats individuels
   results.filter(r => r.a_nage && r.rang && r.rang <= 3 && (isSerieTourR ? true : r.events?.tour === 'finale')).forEach(r => {
     const ath = r.events?.athletes;
     if (!ath) return;
     const key = r.events.athlete_id;
     const label = `${ath.prenom} ${ath.nom}`;
-    ensureMedal(key, label, false);
+    ensureMedal(key, label, false, normSexe(ath.sexe));
     const epr = `${r.events.epreuve}${r.events.tour && r.events.tour !== 'serie' ? ' ('+r.events.tour+')' : ''}`;
     if (r.rang === 1) medalsByAthlete[key].or.push(epr);
     else if (r.rang === 2) medalsByAthlete[key].argent.push(epr);
     else if (r.rang === 3) medalsByAthlete[key].bronze.push(epr);
   });
-  // Relais : finale seulement, ou rang 1-3 pour classements au temps
+  // Relais
   allRelayResults.filter(rr => rr.rang && rr.rang <= 3 && (isSerieTourR ? true : rr.relay_events?.tour === 'finale')).forEach(rr => {
     const nom = rr.relay_events?.type_relais; if (!nom) return;
     const key = 'relay_' + rr.relay_events.id;
-    const label = nom;
-    ensureMedal(key, label, true);
+    ensureMedal(key, nom, true, normSexe(rr.relay_events?.sexe));
     const epr = `${nom}${rr.relay_events.tour ? ' ('+rr.relay_events.tour+')' : ''}`;
     if (rr.rang === 1) medalsByAthlete[key].or.push(epr);
     else if (rr.rang === 2) medalsByAthlete[key].argent.push(epr);
@@ -805,19 +811,33 @@ function renderResultats() {
     medalsCard.style.display = 'none';
   } else {
     medalsCard.style.display = '';
-    document.getElementById('medals-tbody').innerHTML = medalists.map(m => {
-      const total = m.or.length + m.argent.length + m.bronze.length;
-      const allEpr = [...m.or, ...m.argent, ...m.bronze];
-      const relayBadge = m.isRelay ? `<span style="font-size:9px;background:#EBF0F8;color:var(--blue);padding:1px 5px;border-radius:10px;margin-left:4px;font-weight:600">RELAIS</span>` : '';
-      return `<tr>
-        <td><strong>${m.label}</strong>${relayBadge}</td>
-        <td style="text-align:center;font-size:16px">${m.or.length ? '🥇'.repeat(m.or.length) : '—'}</td>
-        <td style="text-align:center;font-size:16px">${m.argent.length ? '🥈'.repeat(m.argent.length) : '—'}</td>
-        <td style="text-align:center;font-size:16px">${m.bronze.length ? '🥉'.repeat(m.bronze.length) : '—'}</td>
-        <td style="text-align:center;font-weight:700;color:var(--navy)">${total}</td>
-        <td style="font-size:11px;color:var(--muted)">${allEpr.join(', ')}</td>
-      </tr>`;
-    }).join('');
+    const renderMedalsSection = (list, titre, sexeHtml) => {
+      if (!list.length) return '';
+      const rows = list.map(m => {
+        const total = m.or.length + m.argent.length + m.bronze.length;
+        const allEpr = [...m.or, ...m.argent, ...m.bronze];
+        const relayBadge = m.isRelay ? `<span style="font-size:9px;background:#EBF0F8;color:var(--blue);padding:1px 5px;border-radius:10px;margin-left:4px;font-weight:600">RELAIS</span>` : '';
+        return `<tr>
+          <td><strong>${m.label}</strong>${relayBadge}</td>
+          <td style="text-align:center;font-size:16px">${m.or.length ? '🥇'.repeat(m.or.length) : '—'}</td>
+          <td style="text-align:center;font-size:16px">${m.argent.length ? '🥈'.repeat(m.argent.length) : '—'}</td>
+          <td style="text-align:center;font-size:16px">${m.bronze.length ? '🥉'.repeat(m.bronze.length) : '—'}</td>
+          <td style="text-align:center;font-weight:700;color:var(--navy)">${total}</td>
+          <td style="font-size:11px;color:var(--muted)">${allEpr.join(', ')}</td>
+        </tr>`;
+      }).join('');
+      const totaux = list.reduce((acc, m) => { acc.or += m.or.length; acc.argent += m.argent.length; acc.bronze += m.bronze.length; return acc; }, {or:0,argent:0,bronze:0});
+      return `<tr style="background:var(--surface2)"><td colspan="6" style="padding:4px 10px;font-size:11px;font-weight:600;color:var(--muted)">${sexeHtml} ${titre} — 🥇 ${totaux.or} · 🥈 ${totaux.argent} · 🥉 ${totaux.bronze}</td></tr>${rows}`;
+    };
+    const hommes = medalists.filter(m => m.sexe === 'M');
+    const femmes = medalists.filter(m => m.sexe === 'F');
+    const mixtes = medalists.filter(m => m.sexe === 'Mixte');
+    const autres = medalists.filter(m => !['M','F','Mixte'].includes(m.sexe));
+    document.getElementById('medals-tbody').innerHTML =
+      renderMedalsSection(hommes, 'Hommes', '♂') +
+      renderMedalsSection(femmes, 'Femmes', '♀') +
+      renderMedalsSection(mixtes, 'Mixte', '⚡') +
+      renderMedalsSection(autres, 'Autre', '');
   }
 
   // ── Places gagnées par nageur ────────────────────────────
@@ -1040,10 +1060,14 @@ function renderResultats() {
         </tr>`;
       }).join('');
 
+      const groupSexe = rows.find(r=>r._isRelay)?.rr?.relay_events?.sexe
+        || rows.find(r=>!r._isRelay)?.events?.athletes?.sexe
+        || null;
       return `
         <div style="border-bottom:2px solid var(--surface2)">
           <div style="padding:8px 14px;background:var(--surface2);font-size:12px;font-weight:600;color:var(--navy);display:flex;align-items:center;gap:8px">
             <span>${epreuve}</span>
+            ${sexeBadge(groupSexe)}
             <span class="badge badge-gray">${rows.filter(r=>r._isRelay||r.a_nage).length} nagé(s)</span>
             ${rows.filter(r=>(r._isRelay?r.rr.rang:r.rang)&&(r._isRelay?r.rr.rang:r.rang)<=3).length ? `<span class="badge badge-green">🏅 ${rows.filter(r=>(r._isRelay?r.rr.rang:r.rang)&&(r._isRelay?r.rr.rang:r.rang)<=3).length} podium(s)</span>` : ''}
           </div>
@@ -1140,14 +1164,6 @@ function renderMissingResults() {
     if (!nom) return null;
     if (/mixte/i.test(nom)) return 'Mixte';
     return null;
-  };
-  const sexeBadge = sexe => {
-    if (!sexe) return '';
-    const s = sexe.toLowerCase();
-    if (s === 'femmes' || s === 'f') return '<span style="font-size:10px;background:#FDEEF5;color:#C2185B;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">♀ Femmes</span>';
-    if (s === 'hommes' || s === 'm') return '<span style="font-size:10px;background:#EBF3FB;color:#1565C0;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">♂ Hommes</span>';
-    if (s === 'mixte') return '<span style="font-size:10px;background:#F0F0F0;color:#555;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">Mixte</span>';
-    return '';
   };
 
   const relayRows = missingRelay.map(re => {
@@ -1376,6 +1392,15 @@ async function saveRelayResultEdit(rrId) {
     await loadAllData();
     renderResultats();
   }
+}
+
+function sexeBadge(sexe) {
+  if (!sexe) return '';
+  const s = sexe.toLowerCase();
+  if (s === 'femmes' || s === 'f') return '<span style="font-size:10px;background:#FDEEF5;color:#C2185B;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">♀ Femmes</span>';
+  if (s === 'hommes' || s === 'm') return '<span style="font-size:10px;background:#EBF3FB;color:#1565C0;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">♂ Hommes</span>';
+  if (s === 'mixte') return '<span style="font-size:10px;background:#F0F0F0;color:#555;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">Mixte</span>';
+  return '';
 }
 
 function renderEntraineurs() {
