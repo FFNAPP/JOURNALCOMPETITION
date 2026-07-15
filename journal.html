@@ -1387,6 +1387,8 @@ function applyPhase(phases) {
   badge.className = 'day-badge ' + badgeClasses[phases[0]];
   badge.textContent = phases.map(p => badgeLabels[p] || p).join(' · ');
 
+  document.getElementById('save-bar').style.display = '';
+
   phases.forEach(phase => {
     // Créer le bandeau pour cette phase
     const banner = document.createElement('div');
