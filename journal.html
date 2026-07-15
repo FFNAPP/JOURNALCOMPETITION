@@ -1197,6 +1197,7 @@ let activeCompId = null, activeCoachId = null, activeComp = null;
 let activeRole = 'entraineur'; // 'entraineur' | 'staff_responsable'
 let currentDate = new Date().toISOString().split('T')[0];
 let currentPhase = null; // 'precomp' | 'comp' | 'postcomp' | null
+let currentPhases = []; // toutes les phases actives du jour
 let allNations = [], nationObsData = [];
 let currentEvents = [], resultStates = {};
 let scores     = { commu: null, stress: null, concentration: null, expression: null, decisions: null, presence: null };
@@ -1295,31 +1296,28 @@ function firstConfiguredDate(comp) {
 
 function detectPhase(dateStr, comp) {
   if (!comp) return [];
-  const d = dateStr; // string 'YYYY-MM-DD'
+  const d = dateStr;
   const phases = [];
 
-  // Voyage aller/retour — priorité absolue sur toute autre phase
-  if (comp.date_voyage_aller && d === comp.date_voyage_aller)
-    phases.push('voyage');
-  else if (comp.date_voyage_retour && d === comp.date_voyage_retour)
+  // Voyage aller/retour — toujours inclus s'il correspond, mais n'exclut plus les autres phases
+  if ((comp.date_voyage_aller && d === comp.date_voyage_aller) ||
+      (comp.date_voyage_retour && d === comp.date_voyage_retour))
     phases.push('voyage');
 
   // Bilan
-  if (comp.date_bilan && d === comp.date_bilan && !phases.includes('voyage'))
+  if (comp.date_bilan && d === comp.date_bilan)
     phases.push('postcomp');
 
   // Compétition
-  if (comp.date_debut && comp.date_fin && d >= comp.date_debut && d <= comp.date_fin && !phases.includes('voyage'))
+  if (comp.date_debut && comp.date_fin && d >= comp.date_debut && d <= comp.date_fin)
     phases.push('comp');
 
   // Stage
-  if (!phases.includes('voyage')) {
-    if (comp.date_stage_debut && comp.date_stage_fin &&
-        d >= comp.date_stage_debut && d <= comp.date_stage_fin)
-      phases.push('stage');
-    else if (comp.date_stage_debut && !comp.date_stage_fin && d === comp.date_stage_debut)
-      phases.push('stage');
-  }
+  if (comp.date_stage_debut && comp.date_stage_fin &&
+      d >= comp.date_stage_debut && d <= comp.date_stage_fin)
+    phases.push('stage');
+  else if (comp.date_stage_debut && !comp.date_stage_fin && d === comp.date_stage_debut)
+    phases.push('stage');
 
   return phases;
 }
@@ -1351,6 +1349,7 @@ function applyVoyageRole() {
 }
 
 function applyPhase(phases) {
+  currentPhases = phases;
   currentPhase = phases.length > 0 ? phases[0] : null;
   const zones = ['voyage','precomp','precomp-staff','comp','staff','postcomp','postcomp-staff','hors-periode'];
   zones.forEach(z => { const el = document.getElementById('zone-'+z); if (el) el.style.display = 'none'; });
@@ -2008,15 +2007,18 @@ async function confirmAddNationObs(btn) {
 
 // ── SAUVEGARDE ─────────────────────────────────────────────
 async function saveCurrentPhase() {
-  if      (currentPhase === 'stage'    && activeRole === 'staff_responsable') await savePrecompStaff();
-  else if (currentPhase === 'stage')    await savePrecomp();
-  else if (currentPhase === 'voyage')   await saveVoyage();
-  else if (currentPhase === 'precomp'  && activeRole === 'staff_responsable') await savePrecompStaff();
-  else if (currentPhase === 'precomp')  await savePrecomp();
-  else if (currentPhase === 'comp'    && activeRole === 'staff_responsable') await saveStaff();
-  else if (currentPhase === 'comp')     await saveComp();
-  else if (currentPhase === 'postcomp' && activeRole === 'staff_responsable') await savePostcompStaff();
-  else if (currentPhase === 'postcomp') await savePostcomp();
+  // Sauvegarder toutes les phases actives du jour (ex: voyage + comp sur même date)
+  for (const phase of currentPhases) {
+    if      (phase === 'voyage')                                        await saveVoyage();
+    else if (phase === 'stage'   && activeRole === 'staff_responsable') await savePrecompStaff();
+    else if (phase === 'stage')                                         await savePrecomp();
+    else if (phase === 'precomp' && activeRole === 'staff_responsable') await savePrecompStaff();
+    else if (phase === 'precomp')                                       await savePrecomp();
+    else if (phase === 'comp'    && activeRole === 'staff_responsable') await saveStaff();
+    else if (phase === 'comp')                                          await saveComp();
+    else if (phase === 'postcomp'&& activeRole === 'staff_responsable') await savePostcompStaff();
+    else if (phase === 'postcomp')                                      await savePostcomp();
+  }
 }
 
 // ── FILL & SAVE VOYAGE ─────────────────────────────────────
