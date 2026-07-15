@@ -818,7 +818,8 @@ function renderResultats() {
   allRelayResults.filter(rr => rr.rang && rr.rang <= 3 && (isSerieTourR ? true : rr.relay_events?.tour === 'finale')).forEach(rr => {
     const nom = rr.relay_events?.type_relais; if (!nom) return;
     const key = 'relay_' + rr.relay_events.id;
-    ensureMedal(key, nom, true, normSexe(rr.relay_events?.sexe));
+    const relaySexeM = rr.relay_events?.sexe || (/mixte/i.test(nom) ? 'Mixte' : null);
+    ensureMedal(key, nom, true, normSexe(relaySexeM));
     const epr = `${nom}${rr.relay_events.tour ? ' ('+rr.relay_events.tour+')' : ''}`;
     if (rr.rang === 1) medalsByAthlete[key].or.push(epr);
     else if (rr.rang === 2) medalsByAthlete[key].argent.push(epr);
@@ -1016,12 +1017,14 @@ function renderResultats() {
     if (!byEpreuve[nom]) byEpreuve[nom] = [];
     byEpreuve[nom].push(r);
   });
-  // Ajouter les relais
+  // Ajouter les relais — clé = type_relais + sexe pour séparer H/F/Mixte
   allRelayResults.forEach(rr => {
     const nom = rr.relay_events?.type_relais;
     if (!nom) return;
-    if (!byEpreuve[nom]) byEpreuve[nom] = [];
-    byEpreuve[nom].push({ _isRelay: true, rr });
+    const relaySexe = rr.relay_events?.sexe || (/mixte/i.test(nom) ? 'Mixte' : null);
+    const key = nom + (relaySexe ? '__' + relaySexe : '');
+    if (!byEpreuve[key]) byEpreuve[key] = [];
+    byEpreuve[key].push({ _isRelay: true, rr, _relaySexe: relaySexe, _relayNom: nom });
   });
 
   const epreuveOrder = ['serie','demi-finale','finale'];
@@ -1092,13 +1095,15 @@ function renderResultats() {
         </tr>`;
       }).join('');
 
-      const groupSexe = rows.find(r=>r._isRelay)?.rr?.relay_events?.sexe
-        || rows.find(r=>!r._isRelay)?.events?.athletes?.sexe
-        || null;
+      const firstRelay = rows.find(r=>r._isRelay);
+      const groupSexe = firstRelay
+        ? (firstRelay._relaySexe || firstRelay.rr?.relay_events?.sexe || (/mixte/i.test(firstRelay._relayNom||'') ? 'Mixte' : null))
+        : rows.find(r=>!r._isRelay)?.events?.athletes?.sexe || null;
+      const displayNom = firstRelay ? (firstRelay._relayNom || epreuve) : epreuve;
       return `
         <div style="border-bottom:2px solid var(--surface2)">
           <div style="padding:8px 14px;background:var(--surface2);font-size:12px;font-weight:600;color:var(--navy);display:flex;align-items:center;gap:8px">
-            <span>${epreuve}</span>
+            <span>${displayNom}</span>
             ${sexeBadge(groupSexe)}
             <span class="badge badge-gray">${rows.filter(r=>r._isRelay||r.a_nage).length} nagé(s)</span>
             ${rows.filter(r=>(r._isRelay?r.rr.rang:r.rang)&&(r._isRelay?r.rr.rang:r.rang)<=3).length ? `<span class="badge badge-green">🏅 ${rows.filter(r=>(r._isRelay?r.rr.rang:r.rang)&&(r._isRelay?r.rr.rang:r.rang)<=3).length} podium(s)</span>` : ''}
@@ -1769,7 +1774,8 @@ function renderRapportFinal() {
       const nom = rr.relay_events?.type_relais; if (!nom) return;
       const key = 'relay_' + rr.relay_events.id;
       const epr = `${nom}${rr.relay_events.tour ? ' ('+rr.relay_events.tour+')' : ''}`;
-      ensureMedR(key, nom, true, normSexeR(rr.relay_events?.sexe));
+      const relaySexeR = rr.relay_events?.sexe || (/mixte/i.test(nom) ? 'Mixte' : null);
+      ensureMedR(key, nom, true, normSexeR(relaySexeR));
       if (rr.rang === 1) medR[key].or.push(epr);
       else if (rr.rang === 2) medR[key].argent.push(epr);
       else medR[key].bronze.push(epr);
