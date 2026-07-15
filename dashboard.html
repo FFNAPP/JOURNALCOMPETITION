@@ -916,12 +916,22 @@ function renderResultats() {
 
   // ── Meilleures épreuves ──────────────────────────────────
   const topEl = document.getElementById('results-top-epreuves');
-  // Agréger par nom d'épreuve (individuel + relais)
+  const tourPriority = { 'finale': 3, 'demi-finale': 2, 'serie': 1 };
   const eprStats = {};
   const ensureEpr = nom => { if (!eprStats[nom]) eprStats[nom] = { rang: [], places: [], isRelay: false }; };
 
-  results.filter(r => r.a_nage && r.rang != null).forEach(r => {
-    const nom = r.events?.epreuve; if (!nom) return;
+  // Par épreuve, garder une seule entrée par nageur : finale > demi-finale > série
+  const byEprAth = {}; // key: epreuve+athlete_id → best result
+  results.filter(r => r.a_nage && r.rang != null && r.events?.epreuve).forEach(r => {
+    const key = r.events.epreuve + '__' + r.events.athlete_id;
+    const existing = byEprAth[key];
+    const prio = tourPriority[r.events.tour] || 0;
+    if (!existing || prio > (tourPriority[existing.events.tour] || 0)) {
+      byEprAth[key] = r;
+    }
+  });
+  Object.values(byEprAth).forEach(r => {
+    const nom = r.events.epreuve;
     ensureEpr(nom);
     eprStats[nom].rang.push(r.rang);
     if (r.events?.ranking_initial != null) {
@@ -1771,11 +1781,28 @@ function renderRapportFinal() {
       const tot = list.reduce((acc,m)=>({or:acc.or+m.or.length,argent:acc.argent+m.argent.length,bronze:acc.bronze+m.bronze.length}),{or:0,argent:0,bronze:0});
       return `<tr style="background:var(--surface2)"><td colspan="5" style="padding:4px 8px;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">${titre} — 🥇 ${tot.or} · 🥈 ${tot.argent} · 🥉 ${tot.bronze}</td></tr>${rows}`;
     };
+    const genresSummary = (() => {
+      const groups = [
+        { label: '♂ Hommes', list: medalistesR.filter(m=>m.sexe==='M') },
+        { label: '♀ Femmes', list: medalistesR.filter(m=>m.sexe==='F') },
+        { label: 'Mixte',    list: medalistesR.filter(m=>m.sexe==='Mixte') },
+      ].filter(g => g.list.length);
+      if (!groups.length) return '';
+      return `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px">` +
+        groups.map(g => {
+          const t = g.list.reduce((acc,m)=>({or:acc.or+m.or.length,argent:acc.argent+m.argent.length,bronze:acc.bronze+m.bronze.length}),{or:0,argent:0,bronze:0});
+          return `<div style="background:var(--surface2);border-radius:8px;padding:6px 12px;font-size:11px">
+            <span style="font-weight:600;color:var(--navy)">${g.label}</span>
+            <span style="margin-left:8px">🥇 ${t.or} · 🥈 ${t.argent} · 🥉 ${t.bronze}</span>
+          </div>`;
+        }).join('') + `</div>`;
+    })();
     const medaillesHtml = medalistesR.length ? `
       <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
-        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">
           Tableau des médailles — 🥇 ${totOrR} · 🥈 ${totArgentR} · 🥉 ${totBronzeR}
         </div>
+        ${genresSummary}
         <table style="width:100%;border-collapse:collapse;font-size:11px">
           <thead><tr style="background:var(--surface2)">
             <th style="padding:5px 8px;text-align:left;color:var(--muted);font-weight:600">Nageur / Relais</th>
