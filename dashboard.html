@@ -1052,7 +1052,7 @@ function renderResultats() {
             <td style="font-family:'DM Mono',monospace;font-size:11px">${fmtDate(rr.relay_events?.date_epreuve)}</td>
             <td><span class="badge badge-green">✓ Nagé</span></td>
             <td id="rr-temps-${rr.id}" style="font-family:'DM Mono',monospace;font-weight:500"><span style="${tempsStyle}">${rr.temps_final || '—'}</span></td>
-            <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${ref || '—'}</td>
+            <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${ref ? normalizeTemps(ref) : '—'}</td>
             <td style="font-family:'DM Mono',monospace;font-size:11px;font-weight:600;${tempsCmp===null?'color:var(--hint)':tempsCmp<0?'color:#155724':tempsCmp>0?'color:#922b21':'color:var(--muted)'}">${(tempsCmp===null||!ref||!rr.temps_final)?'—':pctVsRef(rr.temps_final,ref)}</td>
             <td id="rr-rang-${rr.id}">${rr.rang ? `<span class="badge ${podium ? 'badge-green' : rr.rang <= 8 ? 'badge-orange' : 'badge-gray'}">${podium ? '🏅 ' : ''}${rr.rang}</span>` : '—'}</td>
             <td>—</td>
@@ -1138,7 +1138,7 @@ function renderResultats() {
         <td style="font-family:'DM Mono',monospace;font-size:11px">${fmtDate(r.events?.date_epreuve)}</td>
         <td id="result-anage-${rid}">${r.a_nage ? '<span class="badge badge-green">✓</span>' : '<span class="badge badge-red">✕</span>'}</td>
         <td id="result-temps-${rid}" style="font-family:'DM Mono',monospace;font-weight:500"><span style="${_ts2}">${tempsNorm || '—'}</span></td>
-        <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.temps_engagement || '—'}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.temps_engagement ? normalizeTemps(r.events.temps_engagement) : '—'}</td>
         <td style="font-family:'DM Mono',monospace;font-size:11px;font-weight:600;${_cmp2 === null ? 'color:var(--hint)' : _cmp2 < 0 ? 'color:#155724' : _cmp2 > 0 ? 'color:#922b21' : 'color:var(--muted)'}">${(_cmp2 === null || !_ref2 || !tempsNorm) ? '—' : pctVsRef(tempsNorm, _ref2)}</td>
         <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.ranking_initial != null ? '#'+r.events.ranking_initial : '—'}</td>
         <td id="result-rang-${rid}">${r.rang ? `<span class="badge ${r.rang<=3?'badge-green':r.rang<=8?'badge-orange':'badge-gray'}">${r.rang}</span>` : '—'}</td>
