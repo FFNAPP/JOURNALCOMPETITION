@@ -504,7 +504,7 @@ async function loadAllData() {
     applyCoachFilter(sb.from('postcomp_entries').select('coach_id').eq('competition_id', activeCompId)),
     sb.from('relay_events').select('*, coaches(prenom, nom), relay_athletes(position, athlete_id)').eq('competition_id', activeCompId),
     sb.from('relay_results').select('*, relay_events(*), coaches(prenom, nom)').eq('relay_events.competition_id', activeCompId),
-    sb.from('competition_coaches').select('coach_id, coaches(id, prenom, nom)').eq('competition_id', activeCompId),
+    sb.from('competition_coaches').select('coach_id, coaches(id, prenom, nom, role)').eq('competition_id', activeCompId),
   ]);
   activeComp          = comp.data || null;
   allJournals         = j.data   || [];
