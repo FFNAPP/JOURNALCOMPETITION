@@ -147,6 +147,31 @@
   @media (max-width: 768px) {
     .kpi-row { grid-template-columns: 1fr 1fr; }
     .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .main { padding: 1rem; }
+    /* Header : masquer le label "Compétition" sur petit écran */
+    .comp-select-header label { display: none; }
+    .header-title { display: none; }
+    /* Nav tabs scrollable horizontalement */
+    .nav-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; flex-wrap: nowrap; }
+    .tab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; padding: 0 1rem; }
+    .tab-btn { white-space: nowrap; padding: 10px 12px; font-size: 12px; }
+    /* Filtres : scroll horizontal */
+    .filters { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; padding: .75rem 1rem; }
+    .filter-sep { flex-shrink: 0; }
+    /* Tableaux : scroll horizontal */
+    .card { overflow: visible; }
+    .data-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    /* Athlete result row : pile verticalement */
+    .athlete-result { grid-template-columns: 1fr 1fr; }
+    /* Coach entry : pas de flex fixe */
+    .coach-entry-head { flex-wrap: wrap; gap: 4px; }
+    /* Déconnexion : texte masqué sur très petit écran */
+    .header button[onclick="logout()"] { font-size: 11px; padding: 4px 8px; }
+  }
+  @media (max-width: 480px) {
+    .kpi-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .kpi-value { font-size: 22px; }
+    .header { padding: 0 .75rem; }
   }
 </style>
 </head>
@@ -365,7 +390,7 @@
         <div class="card-title">Tableau complet</div>
         <button class="filter-btn" onclick="toggleResultsTable()" id="results-table-toggle" style="font-size:11px">Afficher ▾</button>
       </div>
-      <div id="results-table-wrap" style="display:none">
+      <div id="results-table-wrap" style="display:none;overflow-x:auto;-webkit-overflow-scrolling:touch">
         <table class="data-table">
           <thead><tr><th>Nageur</th><th>Épreuve</th><th>Tour</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Réf.</th><th>% vs réf.</th><th>Rang init.</th><th>Rang final</th><th>Δ places</th><th>Entraîneur</th><th>Observations</th></tr></thead>
           <tbody id="results-full-list"></tbody>
@@ -786,14 +811,14 @@ function renderSynthese() {
   const resultsEl = document.getElementById('results-recent');
   if (!recent.length) { resultsEl.innerHTML = '<div class="empty">Aucun résultat saisi</div>'; }
   else {
-    resultsEl.innerHTML = '<table class="data-table"><thead><tr><th>Nageur</th><th>Épreuve</th><th>Tour</th><th>Temps</th><th>Rang</th></tr></thead><tbody>' +
+    resultsEl.innerHTML = '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table class="data-table"><thead><tr><th>Nageur</th><th>Épreuve</th><th>Tour</th><th>Temps</th><th>Rang</th></tr></thead><tbody>' +
       recent.map(r => `<tr>
         <td>${r.events?.athletes?.prenom} ${r.events?.athletes?.nom}</td>
         <td style="font-size:11px">${r.events?.epreuve}</td>
         <td>${badgeTour(r.events?.tour)}</td>
         <td style="font-family:'DM Mono',monospace;font-weight:500">${r.temps}</td>
         <td>${r.rang ? `<span class="badge ${r.rang <= 3 ? 'badge-green' : 'badge-gray'}">${r.rang}e</span>` : '—'}</td>
-      </tr>`).join('') + '</tbody></table>';
+      </tr>`).join('') + '</tbody></table></div>';
   }
 
   // ── Tableau de complétion des questionnaires ──────────────
@@ -856,7 +881,7 @@ function renderSynthese() {
     </tr>`;
   }).join('');
 
-  compEl.innerHTML = `<table class="data-table">
+  compEl.innerHTML = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table class="data-table">
     <thead><tr>
       <th>Entraîneur</th>
       <th style="text-align:center">Pré-comp</th>
@@ -867,7 +892,7 @@ function renderSynthese() {
       <th style="text-align:center;min-width:80px">Complétion</th>
     </tr></thead>
     <tbody>${rows}</tbody>
-  </table>`;
+  </table></div>`;
 }
 
 function exportResultsCSV() {
@@ -1273,10 +1298,12 @@ function renderResultats() {
             <span class="badge badge-gray">${rows.filter(r=>r._isRelay||r.a_nage).length} nagé(s)</span>
             ${rows.filter(r=>(r._isRelay?r.rr.rang:r.rang)&&(r._isRelay?r.rr.rang:r.rang)<=3).length ? `<span class="badge badge-green">🏅 ${rows.filter(r=>(r._isRelay?r.rr.rang:r.rang)&&(r._isRelay?r.rr.rang:r.rang)<=3).length} podium(s)</span>` : ''}
           </div>
+          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
           <table class="data-table">
             <thead><tr><th>Nageur</th><th>Tour</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Réf.</th><th>% vs réf.</th><th>Rang init.</th><th>Rang final</th><th>Δ</th><th>Entraîneur</th><th>Observations</th></tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
+          </div>
         </div>`;
     }).join('');
   }
@@ -1760,7 +1787,7 @@ function renderEntraineurs() {
         }
       }
 
-      return `<div style="display:grid;grid-template-columns:160px 1fr 1fr 80px 48px;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border)">
+      return `<div style="display:grid;grid-template-columns:minmax(110px,160px) 1fr 1fr minmax(56px,80px) 48px;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border)">
         <div>
           <div style="font-size:13px;font-weight:500;color:var(--navy)">${coach.prenom} ${coach.nom}</div>
           <div style="font-size:10px;color:var(--hint);margin-top:2px">${fmtDate(last.date)} · ${sourceLabel(last.source)}</div>
