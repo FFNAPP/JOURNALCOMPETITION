@@ -245,6 +245,15 @@
         <div id="results-recent"><div class="loading">…</div></div>
       </div>
     </div>
+
+    <!-- Tableau de complétion -->
+    <div class="card" style="margin-top:1rem">
+      <div class="card-head">
+        <div class="card-title">Complétion des questionnaires</div>
+        <div class="card-sub">par entraîneur · tous les formulaires de la compétition</div>
+      </div>
+      <div id="completion-table"><div class="loading">…</div></div>
+    </div>
   </div>
 
   <div class="main" id="tab-resultats" style="display:none">
@@ -422,7 +431,7 @@
 let activeCompId = null, activeComp = null;
 let _dashRole = 'dtn', _dashCoachId = null;
 let allJournals = [], allResults = [], allNationObs = [], allEvents = [];
-let allStaffEntries = [], allPrecompStaff = [], allPostcompStaff = [], allVoyageEntries = [], allPrecompEntries = [];
+let allStaffEntries = [], allPrecompStaff = [], allPostcompStaff = [], allVoyageEntries = [], allPrecompEntries = [], allPostcompEntries = [];
 let allRelayEvents = [], allRelayResults = [];
 let allCompCoaches = [];
 let filterDate = 'all', filterCoach = 'all';
@@ -481,7 +490,7 @@ async function onCompChange() {
 }
 
 async function loadAllData() {
-  const [comp, j, r, n, e, se, ps, pcs, voy, pc, re, rr, cc] = await Promise.all([
+  const [comp, j, r, n, e, se, ps, pcs, voy, pc, poc, re, rr, cc] = await Promise.all([
     sb.from('competitions').select('*').eq('id', activeCompId).single(),
     applyCoachFilter(sb.from('journal_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
     sb.from('results').select('*, events(*, athletes(*)), coaches(*)').eq('competition_id', activeCompId),
@@ -492,23 +501,25 @@ async function loadAllData() {
     applyCoachFilter(sb.from('postcomp_staff_entries').select('*').eq('competition_id', activeCompId)),
     applyCoachFilter(sb.from('voyage_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
     applyCoachFilter(sb.from('precomp_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
+    applyCoachFilter(sb.from('postcomp_entries').select('coach_id').eq('competition_id', activeCompId)),
     sb.from('relay_events').select('*, coaches(prenom, nom), relay_athletes(position, athlete_id)').eq('competition_id', activeCompId),
     sb.from('relay_results').select('*, relay_events(*), coaches(prenom, nom)').eq('relay_events.competition_id', activeCompId),
     sb.from('competition_coaches').select('coach_id, coaches(id, prenom, nom)').eq('competition_id', activeCompId),
   ]);
-  activeComp        = comp.data || null;
-  allJournals       = j.data   || [];
-  allResults        = r.data   || [];
-  allNationObs      = n.data   || [];
-  allEvents         = e.data   || [];
-  allStaffEntries   = se.data  || [];
-  allPrecompStaff   = ps.data  || [];
-  allPostcompStaff  = pcs.data || [];
-  allVoyageEntries  = voy.data || [];
-  allPrecompEntries = pc.data  || [];
-  allRelayEvents    = re.data  || [];
-  allRelayResults   = (rr.data || []).filter(r => r.relay_events);
-  allCompCoaches    = (cc.data || []).map(row => row.coaches).filter(Boolean);
+  activeComp          = comp.data || null;
+  allJournals         = j.data   || [];
+  allResults          = r.data   || [];
+  allNationObs        = n.data   || [];
+  allEvents           = e.data   || [];
+  allStaffEntries     = se.data  || [];
+  allPrecompStaff     = ps.data  || [];
+  allPostcompStaff    = pcs.data || [];
+  allVoyageEntries    = voy.data || [];
+  allPrecompEntries   = pc.data  || [];
+  allPostcompEntries  = poc.data || [];
+  allRelayEvents      = re.data  || [];
+  allRelayResults     = (rr.data || []).filter(r => r.relay_events);
+  allCompCoaches      = (cc.data || []).map(row => row.coaches).filter(Boolean);
   buildFilters();
 }
 
@@ -780,6 +791,67 @@ function renderSynthese() {
       </tr>`).join('') + '</tbody></table>';
   }
 
+  // ── Tableau de complétion des questionnaires ──────────────
+  const compEl = document.getElementById('completion-table');
+  if (!compEl) return;
+  if (!allCompCoaches.length) { compEl.innerHTML = '<div class="empty">Aucun entraîneur affecté</div>'; return; }
+
+  // Calculer le nombre de jours de compétition attendus
+  const compDays = (() => {
+    if (!activeComp?.date_debut || !activeComp?.date_fin) return 0;
+    let d = new Date(activeComp.date_debut), end = new Date(activeComp.date_fin), n = 0;
+    while (d <= end) { n++; d.setDate(d.getDate() + 1); }
+    return n;
+  })();
+
+  const chk = (ok) => ok
+    ? '<span style="color:var(--success);font-size:14px;font-weight:700">✓</span>'
+    : '<span style="color:var(--border);font-size:14px">—</span>';
+  const pct = (n, t) => t === 0 ? '<span style="color:var(--hint)">—</span>'
+    : `<span style="font-weight:600;color:${n===t?'var(--success)':n>0?'var(--accent2)':'var(--error)'}">${n}/${t}</span>`;
+
+  const hasVoyAller  = !!activeComp?.date_voyage_aller;
+  const hasVoyRetour = !!activeComp?.date_voyage_retour;
+
+  const rows = allCompCoaches.map(coach => {
+    const cid = coach.id;
+    const hasPrecomp  = allPrecompEntries.some(p => p.coach_id === cid);
+    const hasPostcomp = allPostcompEntries.some(p => p.coach_id === cid);
+    const journalDays = new Set(allJournals.filter(j => j.coach_id === cid).map(j => j.date_entree)).size;
+    const voyAller  = allVoyageEntries.some(v => v.coach_id === cid && v.type_journee === 'aller');
+    const voyRetour = allVoyageEntries.some(v => v.coach_id === cid && v.type_journee === 'retour');
+    const total = (hasPrecomp?1:0) + journalDays + (hasPostcomp?1:0) + (hasVoyAller&&voyAller?1:0) + (hasVoyRetour&&voyRetour?1:0);
+    const max = 1 + compDays + 1 + (hasVoyAller?1:0) + (hasVoyRetour?1:0);
+    const fillPct = max > 0 ? Math.round(total / max * 100) : 0;
+    const fillColor = fillPct >= 80 ? 'var(--success)' : fillPct >= 40 ? 'var(--accent2)' : 'var(--error)';
+    return `<tr>
+      <td style="font-weight:500">${coach.prenom} ${coach.nom}</td>
+      <td style="text-align:center">${chk(hasPrecomp)}</td>
+      <td style="text-align:center">${pct(journalDays, compDays)}</td>
+      <td style="text-align:center">${chk(hasPostcomp)}</td>
+      ${hasVoyAller  ? `<td style="text-align:center">${chk(voyAller)}</td>` : ''}
+      ${hasVoyRetour ? `<td style="text-align:center">${chk(voyRetour)}</td>` : ''}
+      <td style="text-align:center">
+        <span style="font-size:11px;font-weight:700;color:${fillColor}">${fillPct}%</span>
+        <div style="height:4px;background:var(--border);border-radius:2px;margin-top:3px;overflow:hidden">
+          <div style="width:${fillPct}%;height:100%;background:${fillColor};border-radius:2px"></div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  compEl.innerHTML = `<table class="data-table">
+    <thead><tr>
+      <th>Entraîneur</th>
+      <th style="text-align:center">Pré-comp</th>
+      <th style="text-align:center">Journal compétition</th>
+      <th style="text-align:center">Post-comp</th>
+      ${hasVoyAller  ? '<th style="text-align:center">Voyage aller</th>' : ''}
+      ${hasVoyRetour ? '<th style="text-align:center">Voyage retour</th>' : ''}
+      <th style="text-align:center;min-width:80px">Complétion</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
 }
 
 function renderResultats() {
@@ -1059,8 +1131,8 @@ function renderResultats() {
             <td id="rr-temps-${rr.id}" style="font-family:'DM Mono',monospace;font-weight:500"><span style="${tempsStyle}">${rr.temps_final || '—'}</span></td>
             <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${ref ? normalizeTemps(ref) : '—'}</td>
             <td style="font-family:'DM Mono',monospace;font-size:11px;font-weight:600;${tempsCmp===null?'color:var(--hint)':tempsCmp<0?'color:#155724':tempsCmp>0?'color:#922b21':'color:var(--muted)'}">${(tempsCmp===null||!ref||!rr.temps_final)?'—':pctVsRef(rr.temps_final,ref)}</td>
-            <td id="rr-rang-${rr.id}">${rr.rang ? `<span class="badge ${podium ? 'badge-green' : rr.rang <= 8 ? 'badge-orange' : 'badge-gray'}">${podium ? '🏅 ' : ''}${rr.rang}</span>` : '—'}</td>
             <td>—</td>
+            <td id="rr-rang-${rr.id}">${rr.rang ? `<span class="badge ${podium ? 'badge-green' : rr.rang <= 8 ? 'badge-orange' : 'badge-gray'}">${podium ? '🏅 ' : ''}${rr.rang}</span>` : '—'}</td>
             <td style="font-size:11px;color:var(--muted)">${rr.coaches?.prenom || ''} ${rr.coaches?.nom || ''}</td>
             <td>—</td>
             <td><button id="rr-edit-btn-${rr.id}" onclick="toggleRelayResultEdit('${rr.id}','${rr.temps_final||''}',${rr.rang||'null'})"
