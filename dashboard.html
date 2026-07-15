@@ -351,7 +351,10 @@
     <div class="card" style="margin-bottom:1rem">
       <div class="card-head">
         <div class="card-title">Résultats par épreuve</div>
-        <div class="card-sub" id="results-count-label">—</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="card-sub" id="results-count-label">—</span>
+          <button onclick="exportResultsCSV()" style="background:var(--blue-light);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">⬇ Export CSV</button>
+        </div>
       </div>
       <div id="results-by-epreuve"></div>
     </div>
@@ -432,7 +435,7 @@ let activeCompId = null, activeComp = null;
 let _dashRole = 'dtn', _dashCoachId = null;
 let allJournals = [], allResults = [], allNationObs = [], allEvents = [];
 let allStaffEntries = [], allPrecompStaff = [], allPostcompStaff = [], allVoyageEntries = [], allPrecompEntries = [], allPostcompEntries = [];
-let allRelayEvents = [], allRelayResults = [];
+let allRelayEvents = [], allRelayResults = [], allRelaySplits = [];
 let allCompCoaches = [];
 let filterDate = 'all', filterCoach = 'all';
 let currentTab = 'synthese', currentStaffSubTab = 'comp';
@@ -490,7 +493,7 @@ async function onCompChange() {
 }
 
 async function loadAllData() {
-  const [comp, j, r, n, e, se, ps, pcs, voy, pc, poc, re, rr, cc] = await Promise.all([
+  const [comp, j, r, n, e, se, ps, pcs, voy, pc, poc, re, rr, cc, rs] = await Promise.all([
     sb.from('competitions').select('*').eq('id', activeCompId).single(),
     applyCoachFilter(sb.from('journal_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
     sb.from('results').select('*, events(*, athletes(*)), coaches(*)').eq('competition_id', activeCompId),
@@ -502,9 +505,10 @@ async function loadAllData() {
     applyCoachFilter(sb.from('voyage_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
     applyCoachFilter(sb.from('precomp_entries').select('*, coaches(*)').eq('competition_id', activeCompId).order('date_entree')),
     applyCoachFilter(sb.from('postcomp_entries').select('coach_id').eq('competition_id', activeCompId)),
-    sb.from('relay_events').select('*, coaches(prenom, nom), relay_athletes(position, athlete_id)').eq('competition_id', activeCompId),
+    sb.from('relay_events').select('*, coaches(prenom, nom), relay_athletes(position, athlete_id, athletes(id, prenom, nom))').eq('competition_id', activeCompId),
     sb.from('relay_results').select('*, relay_events(*), coaches(prenom, nom)').eq('relay_events.competition_id', activeCompId),
     sb.from('competition_coaches').select('coach_id, coaches(id, prenom, nom, role)').eq('competition_id', activeCompId),
+    sb.from('relay_splits').select('*, relay_results!inner(relay_event_id, relay_events!inner(type_relais, epreuve, competition_id))').eq('relay_results.relay_events.competition_id', activeCompId),
   ]);
   activeComp          = comp.data || null;
   allJournals         = j.data   || [];
@@ -520,6 +524,7 @@ async function loadAllData() {
   allRelayEvents      = re.data  || [];
   allRelayResults     = (rr.data || []).filter(r => r.relay_events);
   allCompCoaches      = (cc.data || []).map(row => row.coaches).filter(Boolean);
+  allRelaySplits      = (rs.data || []).filter(s => s.relay_results);
   buildFilters();
 }
 
@@ -865,6 +870,59 @@ function renderSynthese() {
   </table>`;
 }
 
+function exportResultsCSV() {
+  // Index relay splits by athlete_id
+  const splitsByAthlete = {};
+  allRelaySplits.forEach(s => {
+    const aid = s.athlete_id;
+    if (!aid) return;
+    const nom = s.relay_results?.relay_events?.type_relais || s.relay_results?.relay_events?.epreuve || 'Relais';
+    if (!splitsByAthlete[aid]) splitsByAthlete[aid] = [];
+    splitsByAthlete[aid].push({ nom, temps: s.temps_passage });
+  });
+
+  // Build one row per result (individual events)
+  const rows = [];
+  allResults.forEach(r => {
+    const ath = r.events?.athletes;
+    if (!ath) return;
+    const splits = splitsByAthlete[ath.id] || [];
+    const relayCols = Array.from({ length: 9 }, (_, i) => splits[i] ? `${splits[i].nom} : ${splits[i].temps || ''}` : '');
+    rows.push([
+      '',                                    // IUF
+      ath.nom || '',
+      ath.prenom || '',
+      '',                                    // DDN
+      '',                                    // Genre
+      ath.club || '',
+      r.events?.epreuve || '',
+      r.temps ? normalizeTemps(r.temps) : (r.a_nage === false ? 'DNS' : ''),
+      r.observations || '',
+      ...relayCols,
+    ]);
+  });
+
+  // Sort by Nom then Épreuve
+  rows.sort((a, b) => (a[1]+a[2]).localeCompare(b[1]+b[2]) || a[6].localeCompare(b[6]));
+
+  const headers = ['IUF','Nom','Prénom','Date de Naissance','Genre','Club','Epreuve','Resultat (temps)','Commentaires',
+    'Relais 1','Relais 2','Relais 3','Relais 4','Relais 5','Relais 6','Relais 7','Relais 8','Relais 9'];
+
+  const csvEscape = v => {
+    const s = String(v ?? '');
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g,'""')}"` : s;
+  };
+  const csv = [headers, ...rows].map(r => r.map(csvEscape).join('\t')).join('\n');
+
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `resultats_${activeComp?.nom?.replace(/\s+/g,'_') || 'competition'}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function renderResultats() {
   const { results } = getFiltered();
   document.getElementById('results-count-label').textContent = results.length + ' résultat(s)';
@@ -1134,6 +1192,27 @@ function renderResultats() {
             tempsCmp === 0 ? 'background:#fff3cd;color:#856404;border-radius:4px;padding:2px 6px;border:1px solid #ffc107' :
                              'background:#fde8e8;color:#922b21;border-radius:4px;padding:2px 6px;border:1px solid #f5b7b1';
           const podium = rr.rang && rr.rang <= 3;
+          // Passages individuels
+          const relayEvent = allRelayEvents.find(re => re.id === rr.relay_event_id);
+          const athletes = relayEvent?.relay_athletes
+            ? [...relayEvent.relay_athletes].sort((a,b) => a.position - b.position)
+            : [];
+          const splitsForRR = allRelaySplits.filter(s => s.relay_result_id === rr.id);
+          const splitsHtml = athletes.length ? athletes.map(ra => {
+            const split = splitsForRR.find(s => s.athlete_id === ra.athlete_id);
+            const athName = ra.athletes ? `${ra.athletes.prenom} ${ra.athletes.nom}` : `Nageur ${ra.position}`;
+            return `<tr style="background:#FAFBFD">
+              <td style="padding:4px 10px;font-size:11px;color:var(--muted);font-weight:600;width:20px">${ra.position}</td>
+              <td style="padding:4px 10px;font-size:11px">${athName}</td>
+              <td style="padding:4px 10px" id="rs-temps-${rr.id}-${ra.position}">
+                <span style="font-family:'DM Mono',monospace;font-size:11px">${split?.temps_passage || '—'}</span>
+              </td>
+              <td style="padding:4px 6px">
+                <button onclick="editRelaySplit('${rr.id}','${ra.athlete_id}',${ra.position},'${split?.temps_passage||''}')"
+                  style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer;color:var(--muted)">✏️</button>
+              </td>
+            </tr>`;
+          }).join('') : '';
           return `<tr style="background:var(--surface2)">
             <td><span class="badge badge-gray" style="font-size:10px">RELAIS</span></td>
             <td>${badgeTour(rr.relay_events?.tour)}</td>
@@ -1148,7 +1227,10 @@ function renderResultats() {
             <td>—</td>
             <td><button id="rr-edit-btn-${rr.id}" onclick="toggleRelayResultEdit('${rr.id}','${rr.temps_final||''}',${rr.rang||'null'})"
               style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--muted)">✏️</button></td>
-          </tr>`;
+          </tr>
+          ${splitsHtml ? `<tr style="background:#FAFBFD"><td colspan="12" style="padding:0 0 0 32px;border-bottom:2px solid var(--surface2)">
+            <table style="width:300px;border-collapse:collapse;margin:4px 0">${splitsHtml}</table>
+          </td></tr>` : ''}`;
         }
         const ref = r.events?.temps_engagement;
         const tempsR = normalizeTemps(r.temps);
@@ -1522,6 +1604,47 @@ async function saveRelayResultEdit(rrId) {
     await loadAllData();
     renderResultats();
   }
+}
+
+function editRelaySplit(rrId, athleteId, position, currentTemps) {
+  const cellId = `rs-temps-${rrId}-${position}`;
+  const cell = document.getElementById(cellId);
+  if (!cell) return;
+  if (cell.dataset.editing) return;
+  cell.dataset.editing = '1';
+  const val = currentTemps || '';
+  cell.innerHTML = `<input type="text" id="rsi-${rrId}-${position}" value="${val}" placeholder="55.43"
+    style="width:70px;padding:2px 4px;border:1px solid var(--blue-light);border-radius:4px;font-family:'DM Mono',monospace;font-size:11px">
+    <button onclick="saveRelaySplit('${rrId}','${athleteId}',${position})"
+      style="background:var(--blue-light);color:#fff;border:none;border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer;margin-left:3px">✓</button>
+    <button onclick="cancelRelaySplit('${rrId}',${position},'${val}')"
+      style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 5px;font-size:10px;cursor:pointer;margin-left:2px">✕</button>`;
+}
+
+function cancelRelaySplit(rrId, position, oldVal) {
+  const cell = document.getElementById(`rs-temps-${rrId}-${position}`);
+  if (!cell) return;
+  delete cell.dataset.editing;
+  cell.innerHTML = `<span style="font-family:'DM Mono',monospace;font-size:11px">${oldVal || '—'}</span>`;
+}
+
+async function saveRelaySplit(rrId, athleteId, position) {
+  const input = document.getElementById(`rsi-${rrId}-${position}`);
+  if (!input) return;
+  const temps = normalizeTemps(input.value.trim()) || null;
+  const { error } = await sb.from('relay_splits')
+    .upsert({ relay_result_id: rrId, athlete_id: athleteId, position, temps_passage: temps },
+             { onConflict: 'relay_result_id,athlete_id' });
+  if (error) { alert('Erreur : ' + error.message); return; }
+  const cell = document.getElementById(`rs-temps-${rrId}-${position}`);
+  if (cell) {
+    delete cell.dataset.editing;
+    cell.innerHTML = `<span style="font-family:'DM Mono',monospace;font-size:11px">${temps || '—'}</span>`;
+  }
+  // Mise à jour locale pour l'export CSV
+  const existing = allRelaySplits.find(s => s.relay_result_id === rrId && s.athlete_id === athleteId);
+  if (existing) existing.temps_passage = temps;
+  else allRelaySplits.push({ relay_result_id: rrId, athlete_id: athleteId, position, temps_passage: temps });
 }
 
 function sexeBadge(sexe) {
