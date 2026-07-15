@@ -1003,13 +1003,15 @@ function renderResultats() {
             <td>${badgeTour(rr.relay_events?.tour)}</td>
             <td style="font-family:'DM Mono',monospace;font-size:11px">${fmtDate(rr.relay_events?.date_epreuve)}</td>
             <td><span class="badge badge-green">✓ Nagé</span></td>
-            <td style="font-family:'DM Mono',monospace;font-weight:500"><span style="${tempsStyle}">${rr.temps_final || '—'}</span></td>
+            <td id="rr-temps-${rr.id}" style="font-family:'DM Mono',monospace;font-weight:500"><span style="${tempsStyle}">${rr.temps_final || '—'}</span></td>
             <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${ref || '—'}</td>
             <td>—</td>
-            <td>${rr.rang ? `<span class="badge ${podium ? 'badge-green' : rr.rang <= 8 ? 'badge-orange' : 'badge-gray'}">${podium ? '🏅 ' : ''}${rr.rang}</span>` : '—'}</td>
+            <td id="rr-rang-${rr.id}">${rr.rang ? `<span class="badge ${podium ? 'badge-green' : rr.rang <= 8 ? 'badge-orange' : 'badge-gray'}">${podium ? '🏅 ' : ''}${rr.rang}</span>` : '—'}</td>
             <td>—</td>
             <td style="font-size:11px;color:var(--muted)">${rr.coaches?.prenom || ''} ${rr.coaches?.nom || ''}</td>
             <td>—</td>
+            <td><button id="rr-edit-btn-${rr.id}" onclick="toggleRelayResultEdit('${rr.id}','${rr.temps_final||''}',${rr.rang||'null'})"
+              style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--muted)">✏️</button></td>
           </tr>`;
         }
         const ref = r.events?.temps_engagement;
@@ -1042,8 +1044,8 @@ function renderResultats() {
         <div style="border-bottom:2px solid var(--surface2)">
           <div style="padding:8px 14px;background:var(--surface2);font-size:12px;font-weight:600;color:var(--navy);display:flex;align-items:center;gap:8px">
             <span>${epreuve}</span>
-            <span class="badge badge-gray">${rows.filter(r=>r.a_nage).length} nagé(s)</span>
-            ${rows.filter(r=>r.a_nage&&r.rang&&r.rang<=3).length ? `<span class="badge badge-green">🏅 ${rows.filter(r=>r.a_nage&&r.rang&&r.rang<=3).length} podium(s)</span>` : ''}
+            <span class="badge badge-gray">${rows.filter(r=>r._isRelay||r.a_nage).length} nagé(s)</span>
+            ${rows.filter(r=>(r._isRelay?r.rr.rang:r.rang)&&(r._isRelay?r.rr.rang:r.rang)<=3).length ? `<span class="badge badge-green">🏅 ${rows.filter(r=>(r._isRelay?r.rr.rang:r.rang)&&(r._isRelay?r.rr.rang:r.rang)<=3).length} podium(s)</span>` : ''}
           </div>
           <table class="data-table">
             <thead><tr><th>Nageur</th><th>Tour</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Réf.</th><th>Rang init.</th><th>Rang final</th><th>Δ</th><th>Entraîneur</th><th>Observations</th></tr></thead>
@@ -1141,9 +1143,11 @@ function renderMissingResults() {
   };
   const sexeBadge = sexe => {
     if (!sexe) return '';
-    if (sexe === 'F') return '<span style="font-size:10px;background:#FDEEF5;color:#C2185B;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">♀ Filles</span>';
-    if (sexe === 'M') return '<span style="font-size:10px;background:#EBF3FB;color:#1565C0;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">♂ Garçons</span>';
-    return '<span style="font-size:10px;background:#F0F0F0;color:#555;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">Mixte</span>';
+    const s = sexe.toLowerCase();
+    if (s === 'femmes' || s === 'f') return '<span style="font-size:10px;background:#FDEEF5;color:#C2185B;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">♀ Femmes</span>';
+    if (s === 'hommes' || s === 'm') return '<span style="font-size:10px;background:#EBF3FB;color:#1565C0;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">♂ Hommes</span>';
+    if (s === 'mixte') return '<span style="font-size:10px;background:#F0F0F0;color:#555;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">Mixte</span>';
+    return '';
   };
 
   const relayRows = missingRelay.map(re => {
@@ -1325,6 +1329,52 @@ async function saveResultEdit(rid, eventId, coachId) {
     if (wrap) wrap.style.display = '';
     const toggle = document.getElementById('results-table-toggle');
     if (toggle) toggle.textContent = 'Masquer ▴';
+  }
+}
+
+function toggleRelayResultEdit(rrId, temps, rang) {
+  const btn = document.getElementById('rr-edit-btn-' + rrId);
+  const editing = btn.dataset.editing === '1';
+  if (editing) {
+    btn.dataset.editing = '0';
+    btn.textContent = '✏️';
+    btn.style.cssText = 'background:none;border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--muted)';
+    btn.onclick = () => toggleRelayResultEdit(rrId, temps, rang);
+    document.getElementById('rr-cancel-btn-' + rrId)?.remove();
+    const tempsCell = document.getElementById('rr-temps-' + rrId);
+    const rangCell  = document.getElementById('rr-rang-'  + rrId);
+    tempsCell.innerHTML = `<span>${temps || '—'}</span>`;
+    rangCell.innerHTML  = rang && rang !== 'null' ? `<span class="badge badge-gray">${rang}</span>` : '—';
+    return;
+  }
+  btn.dataset.editing = '1';
+  btn.textContent = '💾';
+  btn.style.background = 'var(--blue)'; btn.style.color = '#fff'; btn.style.borderColor = 'var(--blue)';
+  btn.onclick = () => saveRelayResultEdit(rrId);
+  const cancel = document.createElement('button');
+  cancel.id = 'rr-cancel-btn-' + rrId;
+  cancel.textContent = '✕';
+  cancel.style.cssText = 'background:none;border:1px solid var(--border);border-radius:5px;padding:3px 6px;font-size:11px;cursor:pointer;color:var(--muted);margin-left:4px';
+  cancel.onclick = () => { btn.dataset.editing = '1'; toggleRelayResultEdit(rrId, temps, rang); };
+  btn.after(cancel);
+  document.getElementById('rr-temps-' + rrId).innerHTML =
+    `<input type="text" id="rre-temps-${rrId}" value="${temps !== 'null' ? (temps||'') : ''}" placeholder="3:45.67" style="width:80px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;font-family:'DM Mono',monospace;font-size:12px">`;
+  document.getElementById('rr-rang-' + rrId).innerHTML =
+    `<input type="number" id="rre-rang-${rrId}" value="${rang !== 'null' ? (rang||'') : ''}" min="1" placeholder="Rang" style="width:52px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;font-size:12px">`;
+}
+
+async function saveRelayResultEdit(rrId) {
+  const btn  = document.getElementById('rr-edit-btn-' + rrId);
+  const temps = (document.getElementById('rre-temps-' + rrId)?.value || '').trim() || null;
+  const rang  = parseInt(document.getElementById('rre-rang-'  + rrId)?.value) || null;
+  btn.disabled = true; btn.textContent = '…';
+  const { error } = await sb.from('relay_results').update({ temps_final: temps, rang }).eq('id', rrId);
+  if (error) {
+    alert('Erreur : ' + error.message);
+    btn.disabled = false; btn.textContent = '💾';
+  } else {
+    await loadAllData();
+    renderResultats();
   }
 }
 
