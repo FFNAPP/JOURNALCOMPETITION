@@ -815,9 +815,16 @@ function renderSynthese() {
 
   const rows = allCompCoaches.map(coach => {
     const cid = coach.id;
-    const hasPrecomp  = allPrecompEntries.some(p => p.coach_id === cid);
-    const hasPostcomp = allPostcompEntries.some(p => p.coach_id === cid);
-    const journalDays = new Set(allJournals.filter(j => j.coach_id === cid).map(j => j.date_entree)).size;
+    const isStaff = coach.role === 'staff_responsable';
+    const hasPrecomp  = isStaff
+      ? allPrecompStaff.some(p => p.coach_id === cid)
+      : allPrecompEntries.some(p => p.coach_id === cid);
+    const hasPostcomp = isStaff
+      ? allPostcompStaff.some(p => p.coach_id === cid)
+      : allPostcompEntries.some(p => p.coach_id === cid);
+    const journalDays = isStaff
+      ? new Set(allStaffEntries.filter(j => j.coach_id === cid).map(j => j.date_entree)).size
+      : new Set(allJournals.filter(j => j.coach_id === cid).map(j => j.date_entree)).size;
     const voyAller  = allVoyageEntries.some(v => v.coach_id === cid && v.type_journee === 'aller');
     const voyRetour = allVoyageEntries.some(v => v.coach_id === cid && v.type_journee === 'retour');
     const total = (hasPrecomp?1:0) + journalDays + (hasPostcomp?1:0) + (hasVoyAller&&voyAller?1:0) + (hasVoyRetour&&voyRetour?1:0);
