@@ -918,10 +918,9 @@ function renderResultats() {
   });
   allRelayResults.forEach(rr => {
     if (!rr.rang) return;
-    const nom = rr.relay_events?.type_relais; if (!nom) return;
-    ensureEpr(nom);
-    eprStats[nom].rang.push(rr.rang);
-    eprStats[nom].isRelay = true;
+    ensureEpr('Relais');
+    eprStats['Relais'].rang.push(rr.rang);
+    eprStats['Relais'].isRelay = true;
   });
 
   const eprList = Object.entries(eprStats).map(([nom, d]) => ({
@@ -1697,11 +1696,12 @@ function renderRapportFinal() {
 
     // Médailles
     const medR = {};
-    const ensureMedR = (key, label, isRelay) => { if (!medR[key]) medR[key] = { label, isRelay, or: [], argent: [], bronze: [] }; };
+    const normSexeR = s => { if (!s) return 'inconnu'; const v=s.toLowerCase(); if(v==='f'||v==='femmes') return 'F'; if(v==='m'||v==='hommes') return 'M'; if(v==='mixte') return 'Mixte'; return 'inconnu'; };
+    const ensureMedR = (key, label, isRelay, sexe) => { if (!medR[key]) medR[key] = { label, isRelay, sexe, or: [], argent: [], bronze: [] }; };
     allResults.filter(r => r.a_nage && r.rang && r.rang <= 3 && (isSerieTour ? true : r.events?.tour === 'finale')).forEach(r => {
       const ath = r.events?.athletes; if (!ath) return;
       const epr = `${r.events.epreuve}${r.events.tour && r.events.tour !== 'serie' ? ' ('+r.events.tour+')' : ''}`;
-      ensureMedR(r.events.athlete_id, `${ath.prenom} ${ath.nom}`, false);
+      ensureMedR(r.events.athlete_id, `${ath.prenom} ${ath.nom}`, false, normSexeR(ath.sexe));
       if (r.rang === 1) medR[r.events.athlete_id].or.push(epr);
       else if (r.rang === 2) medR[r.events.athlete_id].argent.push(epr);
       else medR[r.events.athlete_id].bronze.push(epr);
@@ -1710,7 +1710,7 @@ function renderRapportFinal() {
       const nom = rr.relay_events?.type_relais; if (!nom) return;
       const key = 'relay_' + rr.relay_events.id;
       const epr = `${nom}${rr.relay_events.tour ? ' ('+rr.relay_events.tour+')' : ''}`;
-      ensureMedR(key, nom, true);
+      ensureMedR(key, nom, true, normSexeR(rr.relay_events?.sexe));
       if (rr.rang === 1) medR[key].or.push(epr);
       else if (rr.rang === 2) medR[key].argent.push(epr);
       else medR[key].bronze.push(epr);
@@ -1719,6 +1719,18 @@ function renderRapportFinal() {
     const totOrR = medalistesR.reduce((s,m)=>s+m.or.length,0);
     const totArgentR = medalistesR.reduce((s,m)=>s+m.argent.length,0);
     const totBronzeR = medalistesR.reduce((s,m)=>s+m.bronze.length,0);
+    const renderMedSectionR = (list, titre) => {
+      if (!list.length) return '';
+      const rows = list.map((m,i) => `<tr style="background:${i%2?'var(--surface2)':'var(--surface)'}">
+        <td style="padding:5px 8px;font-weight:600">${m.label}${m.isRelay ? ' <span style="font-size:9px;background:#EBF0F8;color:var(--blue);padding:1px 4px;border-radius:8px">RELAIS</span>' : ''}</td>
+        <td style="padding:5px 8px;text-align:center;font-size:13px">${m.or.length ? '🥇'.repeat(m.or.length) : '—'}</td>
+        <td style="padding:5px 8px;text-align:center;font-size:13px">${m.argent.length ? '🥈'.repeat(m.argent.length) : '—'}</td>
+        <td style="padding:5px 8px;text-align:center;font-size:13px">${m.bronze.length ? '🥉'.repeat(m.bronze.length) : '—'}</td>
+        <td style="padding:5px 8px;color:var(--muted)">${[...m.or,...m.argent,...m.bronze].join(', ')}</td>
+      </tr>`).join('');
+      const tot = list.reduce((acc,m)=>({or:acc.or+m.or.length,argent:acc.argent+m.argent.length,bronze:acc.bronze+m.bronze.length}),{or:0,argent:0,bronze:0});
+      return `<tr style="background:var(--surface2)"><td colspan="5" style="padding:4px 8px;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">${titre} — 🥇 ${tot.or} · 🥈 ${tot.argent} · 🥉 ${tot.bronze}</td></tr>${rows}`;
+    };
     const medaillesHtml = medalistesR.length ? `
       <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
         <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">
@@ -1732,13 +1744,12 @@ function renderRapportFinal() {
             <th style="padding:5px 8px;text-align:center">🥉</th>
             <th style="padding:5px 8px;text-align:left;color:var(--muted);font-weight:600">Épreuve(s)</th>
           </tr></thead>
-          <tbody>${medalistesR.map((m,i) => `<tr style="background:${i%2?'var(--surface2)':'var(--surface)'}">
-            <td style="padding:5px 8px;font-weight:600">${m.label}${m.isRelay ? ' <span style="font-size:9px;background:#EBF0F8;color:var(--blue);padding:1px 4px;border-radius:8px">RELAIS</span>' : ''}</td>
-            <td style="padding:5px 8px;text-align:center;font-size:13px">${m.or.length ? '🥇'.repeat(m.or.length) : '—'}</td>
-            <td style="padding:5px 8px;text-align:center;font-size:13px">${m.argent.length ? '🥈'.repeat(m.argent.length) : '—'}</td>
-            <td style="padding:5px 8px;text-align:center;font-size:13px">${m.bronze.length ? '🥉'.repeat(m.bronze.length) : '—'}</td>
-            <td style="padding:5px 8px;color:var(--muted)">${[...m.or,...m.argent,...m.bronze].join(', ')}</td>
-          </tr>`).join('')}</tbody>
+          <tbody>
+            ${renderMedSectionR(medalistesR.filter(m=>m.sexe==='M'), '♂ Hommes')}
+            ${renderMedSectionR(medalistesR.filter(m=>m.sexe==='F'), '♀ Femmes')}
+            ${renderMedSectionR(medalistesR.filter(m=>m.sexe==='Mixte'), 'Mixte')}
+            ${renderMedSectionR(medalistesR.filter(m=>!['M','F','Mixte'].includes(m.sexe)), 'Autre')}
+          </tbody>
         </table>
       </div>` : '';
 
