@@ -580,12 +580,38 @@
       <div class="card">
         <div class="section-header">
           <div class="card-title">Nageurs enregistrés <span id="athletes-count">0</span></div>
-          <button class="btn btn-sm" onclick="loadAthletes()">↺ Actualiser</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm" onclick="openMergeModal()">⇒ Fusionner des doublons</button>
+            <button class="btn btn-sm" onclick="loadAthletes()">↺ Actualiser</button>
+          </div>
         </div>
         <table class="data-table">
           <thead><tr><th>Nom</th><th>Club</th><th>Discipline</th><th>Actions</th></tr></thead>
           <tbody id="athletes-list"><tr><td colspan="4" class="empty">Chargement…</td></tr></tbody>
         </table>
+      </div>
+
+      <!-- Modal fusion -->
+      <div id="merge-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;align-items:center;justify-content:center">
+        <div style="background:#fff;border-radius:12px;padding:24px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+          <div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:4px">Fusionner deux nageurs</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Tous les résultats, épreuves et relais du nageur à supprimer seront rattachés au nageur conservé.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+            <div>
+              <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">NAGEUR À CONSERVER</label>
+              <select id="merge-keep" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:13px"></select>
+            </div>
+            <div>
+              <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">NAGEUR À SUPPRIMER</label>
+              <select id="merge-drop" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:13px"></select>
+            </div>
+          </div>
+          <div id="merge-preview" style="font-size:12px;color:var(--muted);background:var(--surface2);border-radius:6px;padding:10px;margin-bottom:16px;min-height:36px"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-sm" onclick="closeMergeModal()">Annuler</button>
+            <button class="btn btn-sm" style="background:var(--accent);color:#fff;border-color:var(--accent)" onclick="confirmMerge()">⇒ Fusionner</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -993,6 +1019,77 @@ async function deleteAthlete(id) {
   if (!confirm('Supprimer ce nageur ?')) return;
   await sb.from('athletes').delete().eq('id', id);
   toast('Supprimé'); loadAthletes();
+}
+
+// ── FUSION NAGEURS ──────────────────────────────────────
+function openMergeModal() {
+  const opts = allAthletes.map(a =>
+    `<option value="${a.id}">${a.nom} ${a.prenom}${a.club ? ' — ' + a.club : ''}</option>`
+  ).join('');
+  document.getElementById('merge-keep').innerHTML = opts;
+  document.getElementById('merge-drop').innerHTML = opts;
+  // Pré-sélectionner le 2e dans drop pour éviter le même
+  if (allAthletes.length > 1) document.getElementById('merge-drop').selectedIndex = 1;
+  updateMergePreview();
+  const modal = document.getElementById('merge-modal');
+  modal.style.display = 'flex';
+  document.getElementById('merge-keep').onchange = updateMergePreview;
+  document.getElementById('merge-drop').onchange = updateMergePreview;
+}
+
+function closeMergeModal() {
+  document.getElementById('merge-modal').style.display = 'none';
+}
+
+function updateMergePreview() {
+  const keepId = document.getElementById('merge-keep').value;
+  const dropId = document.getElementById('merge-drop').value;
+  const prev = document.getElementById('merge-preview');
+  if (keepId === dropId) { prev.textContent = '⚠ Sélectionnez deux nageurs différents.'; return; }
+  const keep = allAthletes.find(a => a.id === keepId);
+  const drop = allAthletes.find(a => a.id === dropId);
+  prev.innerHTML = `<strong>${drop?.prenom} ${drop?.nom}</strong> (${drop?.club || 'sans club'}) sera supprimé — tous ses résultats seront rattachés à <strong>${keep?.prenom} ${keep?.nom}</strong> (${keep?.club || 'sans club'}).`;
+}
+
+async function confirmMerge() {
+  const keepId = document.getElementById('merge-keep').value;
+  const dropId = document.getElementById('merge-drop').value;
+  if (keepId === dropId) return toast('Sélectionnez deux nageurs différents', 'error');
+  const keep = allAthletes.find(a => a.id === keepId);
+  const drop = allAthletes.find(a => a.id === dropId);
+  if (!confirm(`Fusionner "${drop?.prenom} ${drop?.nom}" → "${keep?.prenom} ${keep?.nom}" ?\nCette action est irréversible.`)) return;
+
+  // Réaffecter toutes les FK dans l'ordre (sans contrainte d'unicité connue sauf competition_athletes)
+  const steps = [
+    // events : athlete_id direct
+    sb.from('events').update({ athlete_id: keepId }).eq('athlete_id', dropId),
+    // relay_athletes : upsert n'est pas possible ici — update, les conflits pos/relay_event seront rares
+    sb.from('relay_athletes').update({ athlete_id: keepId }).eq('athlete_id', dropId),
+    // relay_splits
+    sb.from('relay_splits').update({ athlete_id: keepId }).eq('athlete_id', dropId),
+  ];
+
+  // competition_athletes : risque de doublon (même comp, même nageur) — on supprime d'abord les doublons
+  const { data: caKeep } = await sb.from('competition_athletes').select('competition_id').eq('athlete_id', keepId);
+  const keepComps = new Set((caKeep || []).map(r => r.competition_id));
+  const { data: caDrop } = await sb.from('competition_athletes').select('id, competition_id').eq('athlete_id', dropId);
+  const toDelete = (caDrop || []).filter(r => keepComps.has(r.competition_id)).map(r => r.id);
+  const toUpdate = (caDrop || []).filter(r => !keepComps.has(r.competition_id)).map(r => r.id);
+
+  if (toDelete.length) await sb.from('competition_athletes').delete().in('id', toDelete);
+  if (toUpdate.length) await sb.from('competition_athletes').update({ athlete_id: keepId }).in('id', toUpdate);
+
+  const results = await Promise.all(steps);
+  const errors = results.filter(r => r.error).map(r => r.error.message);
+  if (errors.length) { toast('Erreur(s) : ' + errors.join(', '), 'error'); return; }
+
+  // Supprimer le doublon
+  const { error: delErr } = await sb.from('athletes').delete().eq('id', dropId);
+  if (delErr) { toast('Réaffectation OK mais suppression échouée : ' + delErr.message, 'error'); return; }
+
+  toast(`✓ ${drop?.prenom} ${drop?.nom} fusionné avec ${keep?.prenom} ${keep?.nom}`);
+  closeMergeModal();
+  loadAthletes();
 }
 
 // ── NATIONS ─────────────────────────────────────────────
