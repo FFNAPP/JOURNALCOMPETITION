@@ -1193,6 +1193,11 @@ function renderResultats() {
     byEpreuve[key].push({ _isRelay: true, rr, _relaySexe: relaySexe, _relayNom: nom });
   });
 
+  // Index des athlètes depuis les données déjà en mémoire (fallback si FK relay_athletes→athletes non déclarée)
+  const athleteById = {};
+  allEvents.forEach(e => { if (e.athletes?.id) athleteById[e.athletes.id] = e.athletes; });
+  allResults.forEach(r => { const a = r.events?.athletes; if (a?.id) athleteById[a.id] = a; });
+
   const epreuveOrder = ['serie','demi-finale','finale'];
   const epreuveEl = document.getElementById('results-by-epreuve');
 
@@ -1219,13 +1224,14 @@ function renderResultats() {
           const podium = rr.rang && rr.rang <= 3;
           // Passages individuels
           const relayEvent = allRelayEvents.find(re => re.id === rr.relay_event_id);
-          const athletes = relayEvent?.relay_athletes
+          const athletes = relayEvent?.relay_athletes?.length
             ? [...relayEvent.relay_athletes].sort((a,b) => a.position - b.position)
-            : [];
+            : [1,2,3,4].map(p => ({ position: p, athlete_id: null }));
           const splitsForRR = allRelaySplits.filter(s => s.relay_result_id === rr.id);
-          const splitsHtml = athletes.length ? athletes.map(ra => {
+          const splitsHtml = athletes.map(ra => {
             const split = splitsForRR.find(s => s.athlete_id === ra.athlete_id);
-            const athName = ra.athletes ? `${ra.athletes.prenom} ${ra.athletes.nom}` : `Nageur ${ra.position}`;
+            const athData = ra.athletes || athleteById[ra.athlete_id];
+            const athName = athData ? `${athData.prenom} ${athData.nom}` : `Nageur ${ra.position}`;
             return `<tr style="background:#FAFBFD">
               <td style="padding:4px 10px;font-size:11px;color:var(--muted);font-weight:600;width:20px">${ra.position}</td>
               <td style="padding:4px 10px;font-size:11px">${athName}</td>
@@ -1233,11 +1239,11 @@ function renderResultats() {
                 <span style="font-family:'DM Mono',monospace;font-size:11px">${split?.temps_passage || '—'}</span>
               </td>
               <td style="padding:4px 6px">
-                <button onclick="editRelaySplit('${rr.id}','${ra.athlete_id}',${ra.position},'${split?.temps_passage||''}')"
-                  style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer;color:var(--muted)">✏️</button>
+                ${ra.athlete_id ? `<button onclick="editRelaySplit('${rr.id}','${ra.athlete_id}',${ra.position},'${split?.temps_passage||''}')"
+                  style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer;color:var(--muted)">✏️</button>` : ''}
               </td>
             </tr>`;
-          }).join('') : '';
+          }).join('');
           return `<tr style="background:var(--surface2)">
             <td><span class="badge badge-gray" style="font-size:10px">RELAIS</span></td>
             <td>${badgeTour(rr.relay_events?.tour)}</td>
