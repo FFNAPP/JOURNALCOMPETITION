@@ -110,6 +110,15 @@
   input[type=range].purple-thumb::-webkit-slider-thumb { background: var(--purple); }
   input[type=range].teal-thumb::-webkit-slider-thumb { background: var(--teal); }
   .slider-val { font-size: 13px; font-weight: 600; color: var(--navy); min-width: 20px; text-align: center; font-family: 'DM Mono', monospace; }
+  /* ── SEGMENTED PADS ── */
+  .seg { display:flex; flex-direction:column; gap:4px; width:100%; }
+  .seg-btns { display:flex; gap:4px; }
+  .seg-btn { flex:1; padding:8px 4px; border-radius:7px; border:1px solid var(--border); background:var(--surface); font-size:13px; font-weight:600; color:var(--muted); cursor:pointer; transition:all .15s; }
+  .seg-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .seg-btn.seg-active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .seg-btn.seg-active.purple { background:var(--purple); border-color:var(--purple); }
+  .seg-btn.seg-active.teal { background:var(--teal); border-color:var(--teal); }
+  .seg-cap { font-size:11px; color:var(--hint); text-align:center; min-height:16px; }
 
   /* ── SCORE BUTTONS ── */
   .score-btns { display: flex; gap: 4px; }
@@ -1307,6 +1316,7 @@ function updateStaffSlider(el, valId, color) {
   const ve = document.getElementById(valId); if (ve) ve.textContent = v;
   const pct = ((v-1)/4)*100;
   el.style.background = `linear-gradient(to right,${color} ${pct}%,${color} ${pct}%,var(--border) ${pct}%,var(--border) 100%)`;
+  syncSeg(el);
 }
 
 // ── DÉTECTION DE PHASE ─────────────────────────────────────
@@ -2227,7 +2237,64 @@ function updateSlider(el, valId) {
   const pct = ((v-1)/4)*100;
   const color = el.classList.contains('purple-thumb') ? 'var(--purple)' : el.classList.contains('teal-thumb') ? 'var(--teal)' : 'var(--accent)';
   el.style.background = `linear-gradient(to right,${color} ${pct}%,${color} ${pct}%,var(--border) ${pct}%,var(--border) 100%)`;
+  syncSeg(el);
 }
+
+const SEG_ANCHORS = {
+  default: { 1:'Très bas', 2:'Bas', 3:'Moyen', 4:'Élevé', 5:'Très élevé' },
+  forme:   { 1:'Très mauvaise', 2:'Mauvaise', 3:'Moyenne', 4:'Bonne', 5:'Excellente' },
+  mental:  { 1:'Très faible', 2:'Faible', 3:'Modéré', 4:'Fort', 5:'Très fort' },
+  qualite: { 1:'Très mauvaise', 2:'Mauvaise', 3:'Correcte', 4:'Bonne', 5:'Excellente' },
+  eval:    { 1:'Insuffisant', 2:'Passable', 3:'Correct', 4:'Bien', 5:'Excellent' },
+};
+
+function syncSeg(rangeEl) {
+  const pad = rangeEl._segPad;
+  if (!pad) return;
+  const v = parseInt(rangeEl.value);
+  pad.querySelectorAll('.seg-btn').forEach(btn => {
+    const isActive = parseInt(btn.dataset.val) === v;
+    btn.classList.toggle('seg-active', isActive);
+  });
+  const capEl = pad.querySelector('.seg-cap');
+  if (capEl) {
+    const dict = SEG_ANCHORS[rangeEl.dataset.segType || 'default'];
+    capEl.textContent = dict ? (dict[v] || '') : '';
+  }
+}
+
+function buildSegPads() {
+  document.querySelectorAll('input[type=range]').forEach(range => {
+    const wrap = range.parentElement;
+    if (!wrap) return;
+    range.style.display = 'none';
+    const colorClass = range.classList.contains('purple-thumb') ? 'purple' : range.classList.contains('teal-thumb') ? 'teal' : '';
+    const pad = document.createElement('div');
+    pad.className = 'seg';
+    const btnsDiv = document.createElement('div');
+    btnsDiv.className = 'seg-btns';
+    for (let i = 1; i <= 5; i++) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'seg-btn' + (colorClass ? ' ' + colorClass : '');
+      btn.dataset.val = i;
+      btn.textContent = i;
+      btn.addEventListener('click', () => {
+        range.value = i;
+        range.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      btnsDiv.appendChild(btn);
+    }
+    const cap = document.createElement('div');
+    cap.className = 'seg-cap';
+    pad.appendChild(btnsDiv);
+    pad.appendChild(cap);
+    range._segPad = pad;
+    wrap.appendChild(pad);
+    syncSeg(range);
+  });
+}
+buildSegPads();
 
 function updateDayLabel(date) {
   const el = document.getElementById('jour-label'); if (!el || !date) return;
