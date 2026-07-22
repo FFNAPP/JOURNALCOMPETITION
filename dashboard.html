@@ -384,20 +384,6 @@
       <div id="results-by-epreuve"></div>
     </div>
 
-    <!-- Table complète -->
-    <div class="card">
-      <div class="card-head">
-        <div class="card-title">Tableau complet</div>
-        <button class="filter-btn" onclick="toggleResultsTable()" id="results-table-toggle" style="font-size:11px">Afficher ▾</button>
-      </div>
-      <div id="results-table-wrap" style="display:none;overflow-x:auto;-webkit-overflow-scrolling:touch">
-        <table class="data-table">
-          <thead><tr><th>Nageur</th><th>Épreuve</th><th>Tour</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Réf.</th><th>% vs réf.</th><th>Rang init.</th><th>Rang final</th><th>Δ places</th><th>Entraîneur</th><th>Observations</th></tr></thead>
-          <tbody id="results-full-list"></tbody>
-        </table>
-      </div>
-    </div>
-
   </div>
 
   <div class="main" id="tab-entraineurs" style="display:none">
@@ -1298,7 +1284,7 @@ function renderResultats() {
             <td><button id="rr-edit-btn-${rr.id}" onclick="toggleRelayResultEdit('${rr.id}','${rr.temps_final||''}',${rr.rang||'null'})"
               style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--muted)">✏️</button></td>
           </tr>
-          ${splitsHtml ? `<tr style="background:#FAFBFD"><td colspan="12" style="padding:0 0 0 32px;border-bottom:2px solid var(--surface2)">
+          ${splitsHtml ? `<tr style="background:#FAFBFD"><td colspan="13" style="padding:0 0 0 32px;border-bottom:2px solid var(--surface2)">
             <table style="width:300px;border-collapse:collapse;margin:4px 0">${splitsHtml}</table>
           </td></tr>` : ''}`;
         }
@@ -1312,21 +1298,28 @@ function renderResultats() {
           tempsCmp === 0 ? 'background:#fff3cd;color:#856404;border-radius:4px;padding:2px 6px;border:1px solid #ffc107' :
                            'background:#fde8e8;color:#922b21;border-radius:4px;padding:2px 6px;border:1px solid #f5b7b1';
         const podium = r.a_nage && r.rang && r.rang <= 3;
-        return `<tr>
+        const rid = r.event_id + '__' + r.coach_id;
+        window._resultEditCache = window._resultEditCache || {};
+        window._resultEditCache[rid] = { eventId: r.event_id, coachId: r.coach_id, anage: r.a_nage ? 1 : 0, temps: tempsR || '', rang: r.rang || null, rankingInitial: r.events?.ranking_initial ?? null };
+        return `<tr id="result-row-${rid}">
           <td><strong style="font-size:12px">${r.events?.athletes?.prenom} ${r.events?.athletes?.nom}</strong></td>
           <td>${badgeTour(r.events?.tour)}</td>
           <td style="font-family:'DM Mono',monospace;font-size:11px">${fmtDate(r.events?.date_epreuve)}</td>
-          <td>${r.a_nage ? '<span class="badge badge-green">✓ Nagé</span>' : '<span class="badge badge-red">✕ DNS</span>'}</td>
-          <td style="font-family:'DM Mono',monospace;font-weight:500">
+          <td id="result-anage-${rid}">${r.a_nage ? '<span class="badge badge-green">✓ Nagé</span>' : '<span class="badge badge-red">✕ DNS</span>'}</td>
+          <td id="result-temps-${rid}" style="font-family:'DM Mono',monospace;font-weight:500">
             <span style="${tempsStyle}">${tempsR || '—'}</span>
           </td>
           <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${ref || '—'}</td>
           <td style="font-family:'DM Mono',monospace;font-size:11px;font-weight:600;${tempsCmp===null?'color:var(--hint)':tempsCmp<0?'color:#155724':tempsCmp>0?'color:#922b21':'color:var(--muted)'}">${(tempsCmp===null||!ref||!tempsR)?'—':pctVsRef(tempsR,ref)}</td>
-          <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.ranking_initial != null ? '#'+r.events.ranking_initial : '—'}</td>
-          <td>${r.rang ? `<span class="badge ${podium ? 'badge-green' : r.rang <= 8 ? 'badge-orange' : 'badge-gray'}">${podium ? '🏅 ' : ''}${r.rang}</span>` : '—'}</td>
+          <td id="result-rankinit-${rid}">${r.events?.ranking_initial != null ? '#'+r.events.ranking_initial : '—'}</td>
+          <td id="result-rang-${rid}">${r.rang ? `<span class="badge ${podium ? 'badge-green' : r.rang <= 8 ? 'badge-orange' : 'badge-gray'}">${podium ? '🏅 ' : ''}${r.rang}</span>` : '—'}</td>
           <td>${fmtDelta(r.events?.ranking_initial, r.rang)}</td>
           <td style="font-size:11px;color:var(--muted)">${r.coaches?.prenom} ${r.coaches?.nom}</td>
           <td style="font-size:11px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.observations || '—'}</td>
+          <td style="white-space:nowrap;min-width:36px">
+            <button id="result-edit-btn-${rid}" onclick="toggleResultEditCached('${rid}')"
+              style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--muted);display:inline-flex;align-items:center">✏️</button>
+          </td>
         </tr>`;
       }).join('');
 
@@ -1345,55 +1338,11 @@ function renderResultats() {
           </div>
           <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
           <table class="data-table">
-            <thead><tr><th>Nageur</th><th>Tour</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Réf.</th><th>% vs réf.</th><th>Rang init.</th><th>Rang final</th><th>Δ</th><th>Entraîneur</th><th>Observations</th></tr></thead>
+            <thead><tr><th>Nageur</th><th>Tour</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Réf.</th><th>% vs réf.</th><th>Rang init.</th><th>Rang final</th><th>Δ</th><th>Entraîneur</th><th>Observations</th><th></th></tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
           </div>
         </div>`;
-    }).join('');
-  }
-
-  // ── Table complète ───────────────────────────────────────
-  const tbody = document.getElementById('results-full-list');
-  // Update header to add edit column
-  const thead = tbody.closest('table')?.querySelector('thead tr');
-  if (thead && thead.children.length === 13) {
-    const th = document.createElement('th'); th.textContent = ''; thead.appendChild(th);
-  }
-  if (!results.length) {
-    tbody.innerHTML = '<tr><td colspan="13" class="empty">Aucun résultat</td></tr>';
-  } else {
-    window._resultEditCache = window._resultEditCache || {};
-    tbody.innerHTML = results.map(r => {
-      const _ref2 = r.events?.temps_engagement;
-      const tempsNorm = normalizeTemps(r.temps);
-      const _hasT2 = r.a_nage && tempsNorm && tempsNorm !== '0';
-      const _cmp2 = (_hasT2 && _ref2) ? compareTemps(tempsNorm, _ref2) : null;
-      const _ts2 = _cmp2 === null ? '' :
-        _cmp2 < 0  ? 'background:#d4edda;color:#155724;border-radius:4px;padding:2px 6px;border:1px solid #a3d4aa' :
-        _cmp2 === 0 ? 'background:#fff3cd;color:#856404;border-radius:4px;padding:2px 6px;border:1px solid #ffc107' :
-                      'background:#fde8e8;color:#922b21;border-radius:4px;padding:2px 6px;border:1px solid #f5b7b1';
-      const rid = r.event_id + '__' + r.coach_id;
-      window._resultEditCache[rid] = { eventId: r.event_id, coachId: r.coach_id, anage: r.a_nage ? 1 : 0, temps: tempsNorm || '', rang: r.rang || null, rankingInitial: r.events?.ranking_initial ?? null };
-      return `<tr id="result-row-${rid}">
-        <td><strong style="font-size:12px">${r.events?.athletes?.prenom} ${r.events?.athletes?.nom}</strong></td>
-        <td style="font-size:11px">${r.events?.epreuve}</td>
-        <td>${badgeTour(r.events?.tour)}</td>
-        <td style="font-family:'DM Mono',monospace;font-size:11px">${fmtDate(r.events?.date_epreuve)}</td>
-        <td id="result-anage-${rid}">${r.a_nage ? '<span class="badge badge-green">✓</span>' : '<span class="badge badge-red">✕</span>'}</td>
-        <td id="result-temps-${rid}" style="font-family:'DM Mono',monospace;font-weight:500"><span style="${_ts2}">${tempsNorm || '—'}</span></td>
-        <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.temps_engagement ? normalizeTemps(r.events.temps_engagement) : '—'}</td>
-        <td style="font-family:'DM Mono',monospace;font-size:11px;font-weight:600;${_cmp2 === null ? 'color:var(--hint)' : _cmp2 < 0 ? 'color:#155724' : _cmp2 > 0 ? 'color:#922b21' : 'color:var(--muted)'}">${(_cmp2 === null || !_ref2 || !tempsNorm) ? '—' : pctVsRef(tempsNorm, _ref2)}</td>
-        <td id="result-rankinit-${rid}">${r.events?.ranking_initial != null ? '#'+r.events.ranking_initial : '—'}</td>
-        <td id="result-rang-${rid}">${r.rang ? `<span class="badge ${r.rang<=3?'badge-green':r.rang<=8?'badge-orange':'badge-gray'}">${r.rang}</span>` : '—'}</td>
-        <td>${fmtDelta(r.events?.ranking_initial, r.rang)}</td>
-        <td style="font-size:11px;color:var(--muted)">${r.coaches?.prenom} ${r.coaches?.nom}</td>
-        <td style="font-size:11px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.observations || '—'}</td>
-        <td style="white-space:nowrap;min-width:36px">
-          <button id="result-edit-btn-${rid}" onclick="toggleResultEditCached('${rid}')"
-            style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--muted);display:inline-flex;align-items:center">✏️</button>
-        </td>
-      </tr>`;
     }).join('');
   }
 
@@ -1430,6 +1379,7 @@ function renderMissingResults() {
       <td style="font-size:11px;color:var(--muted)">${fmtDate(ev.date_epreuve)}</td>
       <td style="text-align:center"><input type="checkbox" id="mr-anage-${ev.id}" checked></td>
       <td><input type="text" id="mr-temps-${ev.id}" placeholder="1:23.45" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-family:'DM Mono',monospace;font-size:12px"></td>
+      <td><input type="number" id="mr-rankinit-${ev.id}" value="${ev.ranking_initial != null ? ev.ranking_initial : ''}" placeholder="Rang init." min="1" style="width:70px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px"></td>
       <td><input type="number" id="mr-rang-${ev.id}" placeholder="Rang" min="1" style="width:60px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px"></td>
       <td><select id="mr-coach-${ev.id}" style="padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:11px"><option value="">— coach —</option>${coachOpts}</select></td>
       <td><input type="text" id="mr-obs-${ev.id}" placeholder="Observations…" style="width:140px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:11px"></td>
@@ -1447,13 +1397,23 @@ function renderMissingResults() {
   const relayRows = missingRelay.map(re => {
     const coachName = re.coaches ? re.coaches.prenom + ' ' + re.coaches.nom : '—';
     const sexe = re.sexe || inferSexeFromName(re.type_relais);
+    const athletes = (re.relay_athletes || []).slice().sort((a,b) => a.position - b.position);
+    const splitsInputs = (athletes.length ? athletes : [1,2,3,4].map(p=>({position:p,athlete_id:null,athletes:null}))).map(ra => {
+      const athName = ra.athletes ? `${ra.athletes.prenom} ${ra.athletes.nom}` : `Nageur ${ra.position}`;
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="font-size:11px;color:var(--muted);width:20px;flex-shrink:0">${ra.position}</span>
+        <span style="font-size:12px;flex:1;min-width:120px">${athName}</span>
+        ${ra.athlete_id ? `<input type="text" id="mr-split-${re.id}-${ra.athlete_id}" placeholder="m:ss.cc" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-family:'DM Mono',monospace;font-size:12px">` : '<span style="font-size:11px;color:var(--hint)">—</span>'}
+      </div>`;
+    }).join('');
     return `<tr id="missing-relay-row-${re.id}">
-      <td style="font-size:12px;font-weight:600">${re.type_relais || '—'}${sexeBadge(sexe)}</td>
-      <td style="font-size:11px;color:var(--muted)">${coachName}</td>
-      <td style="font-size:11px;color:var(--muted)">${fmtDate(re.date_epreuve)}</td>
-      <td><input type="text" id="mr-rtps-${re.id}" placeholder="3:45.67" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-family:'DM Mono',monospace;font-size:12px"></td>
-      <td><input type="number" id="mr-rrang-${re.id}" placeholder="Rang" min="1" style="width:60px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px"></td>
-      <td><button onclick="saveMissingRelayResult('${re.id}')" style="background:var(--blue);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600">Valider</button></td>
+      <td style="font-size:12px;font-weight:600;vertical-align:top">${re.type_relais || '—'}${sexeBadge(sexe)}</td>
+      <td style="font-size:11px;color:var(--muted);vertical-align:top">${coachName}</td>
+      <td style="font-size:11px;color:var(--muted);vertical-align:top">${fmtDate(re.date_epreuve)}</td>
+      <td style="vertical-align:top">${splitsInputs}</td>
+      <td style="vertical-align:top"><input type="text" id="mr-rtps-${re.id}" placeholder="3:45.67" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-family:'DM Mono',monospace;font-size:12px"></td>
+      <td style="vertical-align:top"><input type="number" id="mr-rrang-${re.id}" placeholder="Rang" min="1" style="width:60px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px"></td>
+      <td style="vertical-align:top"><button onclick="saveMissingRelayResult('${re.id}')" style="background:var(--blue);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600">Valider</button></td>
     </tr>`;
   }).join('');
 
@@ -1461,13 +1421,13 @@ function renderMissingResults() {
     ${indivRows ? `
     <div style="padding:8px 12px 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Épreuves individuelles (${missingIndiv.length})</div>
     <table class="data-table" style="margin-bottom:8px">
-      <thead><tr><th>Nageur</th><th>Épreuve</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Rang</th><th>Coach</th><th>Observations</th><th></th></tr></thead>
+      <thead><tr><th>Nageur</th><th>Épreuve</th><th>Date</th><th>A nagé</th><th>Temps</th><th>Rang init.</th><th>Rang</th><th>Coach</th><th>Observations</th><th></th></tr></thead>
       <tbody>${indivRows}</tbody>
     </table>` : ''}
     ${relayRows ? `
     <div style="padding:8px 12px 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Relais (${missingRelay.length})</div>
     <table class="data-table">
-      <thead><tr><th>Relais</th><th>Référent</th><th>Date</th><th>Temps final</th><th>Rang</th><th></th></tr></thead>
+      <thead><tr><th>Relais</th><th>Référent</th><th>Date</th><th>Passages nageurs</th><th>Temps final</th><th>Rang</th><th></th></tr></thead>
       <tbody>${relayRows}</tbody>
     </table>` : ''}
   </div>`;
@@ -1488,6 +1448,8 @@ async function saveMissingIndivResult(eventId) {
   const temps   = (document.getElementById('mr-temps-' + eventId)?.value || '').trim() || null;
   const rang    = parseInt(document.getElementById('mr-rang-' + eventId)?.value) || null;
   const obs     = (document.getElementById('mr-obs-' + eventId)?.value || '').trim() || null;
+  const rankingInitialVal = document.getElementById('mr-rankinit-' + eventId)?.value;
+  const rankingInitial = rankingInitialVal ? parseInt(rankingInitialVal) : null;
 
   const btn = document.querySelector(`#missing-row-${eventId} button`);
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
@@ -1502,8 +1464,12 @@ async function saveMissingIndivResult(eventId) {
     observations:   obs,
   }, { onConflict: 'event_id,coach_id' });
 
-  if (error) {
-    alert('Erreur : ' + error.message);
+  const { error: error2 } = await sb.from('events').update({
+    ranking_initial: rankingInitial,
+  }).eq('id', eventId);
+
+  if (error || error2) {
+    alert('Erreur : ' + (error || error2).message);
     if (btn) { btn.disabled = false; btn.textContent = 'Valider'; }
   } else {
     const row = document.getElementById('missing-row-' + eventId);
@@ -1525,11 +1491,28 @@ async function saveMissingRelayResult(relayEventId) {
 
   // Check if a result already exists (no unique constraint → can't upsert)
   const { data: existing } = await sb.from('relay_results').select('id').eq('relay_event_id', relayEventId).maybeSingle();
-  let error;
+  let error, relayResultId;
   if (existing) {
+    relayResultId = existing.id;
     ({ error } = await sb.from('relay_results').update({ temps_final: temps, rang }).eq('id', existing.id));
   } else {
-    ({ error } = await sb.from('relay_results').insert({ relay_event_id: relayEventId, temps_final: temps, rang, coach_id: coachId }));
+    const { data: inserted, error: insErr } = await sb.from('relay_results').insert({ relay_event_id: relayEventId, temps_final: temps, rang, coach_id: coachId }).select().single();
+    error = insErr;
+    relayResultId = inserted?.id;
+  }
+
+  // Sauvegarde des passages individuels (relay_splits) saisis pour chaque nageur
+  if (!error && relayResultId) {
+    const athletes = (re?.relay_athletes || []).filter(ra => ra.athlete_id);
+    for (const ra of athletes) {
+      const splitInput = document.getElementById(`mr-split-${relayEventId}-${ra.athlete_id}`);
+      const splitVal = (splitInput?.value || '').trim();
+      if (!splitVal) continue;
+      const { error: splitErr } = await sb.from('relay_splits').upsert({
+        relay_result_id: relayResultId, athlete_id: ra.athlete_id, position: ra.position, temps_passage: splitVal,
+      }, { onConflict: 'relay_result_id,athlete_id' });
+      if (splitErr) error = splitErr;
+    }
   }
 
   if (error) {
@@ -1542,14 +1525,6 @@ async function saveMissingRelayResult(relayEventId) {
     await loadAllData();
     renderResultats();
   }
-}
-
-function toggleResultsTable() {
-  const wrap = document.getElementById('results-table-wrap');
-  const btn  = document.getElementById('results-table-toggle');
-  const visible = wrap.style.display !== 'none';
-  wrap.style.display = visible ? 'none' : '';
-  btn.textContent = visible ? 'Afficher ▾' : 'Masquer ▴';
 }
 
 function toggleResultEditCached(rid) {
@@ -1634,11 +1609,6 @@ async function saveResultEdit(rid, eventId, coachId) {
     if (row) { row.style.background = '#d4edda'; setTimeout(() => { row.style.background = ''; }, 1500); }
     await loadAllData();
     renderResultats();
-    // Re-open table
-    const wrap = document.getElementById('results-table-wrap');
-    if (wrap) wrap.style.display = '';
-    const toggle = document.getElementById('results-table-toggle');
-    if (toggle) toggle.textContent = 'Masquer ▴';
   }
 }
 
