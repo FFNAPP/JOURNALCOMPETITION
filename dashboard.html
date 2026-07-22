@@ -1374,7 +1374,7 @@ function renderResultats() {
         _cmp2 === 0 ? 'background:#fff3cd;color:#856404;border-radius:4px;padding:2px 6px;border:1px solid #ffc107' :
                       'background:#fde8e8;color:#922b21;border-radius:4px;padding:2px 6px;border:1px solid #f5b7b1';
       const rid = r.event_id + '__' + r.coach_id;
-      window._resultEditCache[rid] = { eventId: r.event_id, coachId: r.coach_id, anage: r.a_nage ? 1 : 0, temps: tempsNorm || '', rang: r.rang || null };
+      window._resultEditCache[rid] = { eventId: r.event_id, coachId: r.coach_id, anage: r.a_nage ? 1 : 0, temps: tempsNorm || '', rang: r.rang || null, rankingInitial: r.events?.ranking_initial ?? null };
       return `<tr id="result-row-${rid}">
         <td><strong style="font-size:12px">${r.events?.athletes?.prenom} ${r.events?.athletes?.nom}</strong></td>
         <td style="font-size:11px">${r.events?.epreuve}</td>
@@ -1384,7 +1384,7 @@ function renderResultats() {
         <td id="result-temps-${rid}" style="font-family:'DM Mono',monospace;font-weight:500"><span style="${_ts2}">${tempsNorm || '—'}</span></td>
         <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.temps_engagement ? normalizeTemps(r.events.temps_engagement) : '—'}</td>
         <td style="font-family:'DM Mono',monospace;font-size:11px;font-weight:600;${_cmp2 === null ? 'color:var(--hint)' : _cmp2 < 0 ? 'color:#155724' : _cmp2 > 0 ? 'color:#922b21' : 'color:var(--muted)'}">${(_cmp2 === null || !_ref2 || !tempsNorm) ? '—' : pctVsRef(tempsNorm, _ref2)}</td>
-        <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.events?.ranking_initial != null ? '#'+r.events.ranking_initial : '—'}</td>
+        <td id="result-rankinit-${rid}">${r.events?.ranking_initial != null ? '#'+r.events.ranking_initial : '—'}</td>
         <td id="result-rang-${rid}">${r.rang ? `<span class="badge ${r.rang<=3?'badge-green':r.rang<=8?'badge-orange':'badge-gray'}">${r.rang}</span>` : '—'}</td>
         <td>${fmtDelta(r.events?.ranking_initial, r.rang)}</td>
         <td style="font-size:11px;color:var(--muted)">${r.coaches?.prenom} ${r.coaches?.nom}</td>
@@ -1555,10 +1555,10 @@ function toggleResultsTable() {
 function toggleResultEditCached(rid) {
   const c = (window._resultEditCache || {})[rid];
   if (!c) return;
-  toggleResultEdit(rid, c.eventId, c.coachId, c.anage, c.temps, c.rang);
+  toggleResultEdit(rid, c.eventId, c.coachId, c.anage, c.temps, c.rang, c.rankingInitial);
 }
 
-function toggleResultEdit(rid, eventId, coachId, anage, temps, rang) {
+function toggleResultEdit(rid, eventId, coachId, anage, temps, rang, rankingInitial) {
   const editBtn = document.getElementById('result-edit-btn-' + rid);
   const editing = editBtn.dataset.editing === '1';
   if (editing) {
@@ -1586,7 +1586,7 @@ function toggleResultEdit(rid, eventId, coachId, anage, temps, rang) {
   cancel.id = 'result-cancel-btn-' + rid;
   cancel.textContent = '✕';
   cancel.style.cssText = 'background:none;border:1px solid var(--border);border-radius:5px;padding:3px 6px;font-size:11px;cursor:pointer;color:var(--muted);margin-left:4px';
-  cancel.onclick = () => { editBtn.dataset.editing = '1'; toggleResultEdit(rid, eventId, coachId, anage, temps, rang); };
+  cancel.onclick = () => { editBtn.dataset.editing = '1'; toggleResultEdit(rid, eventId, coachId, anage, temps, rang, rankingInitial); };
   editBtn.after(cancel);
 
   // Replace A nagé cell
@@ -1596,6 +1596,10 @@ function toggleResultEdit(rid, eventId, coachId, anage, temps, rang) {
   // Replace Temps cell
   const tempsCell = document.getElementById('result-temps-' + rid);
   tempsCell.innerHTML = `<input type="text" id="re-temps-${rid}" value="${temps}" placeholder="m:ss.cc" style="width:76px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;font-family:'DM Mono',monospace;font-size:12px" title="Format : m:ss.cc (ex: 1:23.45 ou 58.32)">`;
+
+  // Replace Rang init. cell
+  const rankInitCell = document.getElementById('result-rankinit-' + rid);
+  rankInitCell.innerHTML = `<input type="number" id="re-rankinit-${rid}" value="${rankingInitial != null && rankingInitial !== 'null' ? rankingInitial : ''}" min="1" placeholder="Rang init." style="width:60px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;font-size:12px">`;
 
   // Replace Rang cell
   const rangCell = document.getElementById('result-rang-' + rid);
@@ -1607,6 +1611,8 @@ async function saveResultEdit(rid, eventId, coachId) {
   const anage = document.getElementById('re-anage-' + rid)?.checked ?? true;
   const temps = normalizeTemps((document.getElementById('re-temps-' + rid)?.value || '').trim()) || null;
   const rang  = parseInt(document.getElementById('re-rang-' + rid)?.value) || null;
+  const rankingInitialVal = document.getElementById('re-rankinit-' + rid)?.value;
+  const rankingInitial = rankingInitialVal ? parseInt(rankingInitialVal) : null;
 
   btn.disabled = true; btn.textContent = '…';
 
@@ -1616,8 +1622,12 @@ async function saveResultEdit(rid, eventId, coachId) {
     rang:   anage ? rang  : null,
   }).eq('event_id', eventId).eq('coach_id', coachId);
 
-  if (error) {
-    alert('Erreur : ' + error.message);
+  const { error: error2 } = await sb.from('events').update({
+    ranking_initial: rankingInitial,
+  }).eq('id', eventId);
+
+  if (error || error2) {
+    alert('Erreur : ' + (error || error2).message);
     btn.disabled = false; btn.textContent = '💾 Sauv.';
   } else {
     const row = document.getElementById('result-row-' + rid);

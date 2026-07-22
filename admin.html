@@ -1127,12 +1127,12 @@ function applyCompTypeToEventForm() {
     tourSel.value = 'finale';
     tourSel.style.display = 'none';
     if (note) note.style.display = '';
-    if (rankingWrap) rankingWrap.style.display = '';
   } else {
     tourSel.style.display = '';
     if (note) note.style.display = 'none';
-    if (rankingWrap) { rankingWrap.style.display = 'none'; document.getElementById('ev-ranking').value = ''; }
   }
+  // Rang initial disponible pour tous les types de compétition (masqué uniquement pour les relais, cf. onEpreuveChange)
+  if (rankingWrap) rankingWrap.style.display = '';
 }
 
 // ── LIAISONS entraîneur / compétition ──────────────────
@@ -1322,7 +1322,7 @@ async function editEvent(id) {
       <div><label>Date *</label><input type="date" id="edit-ev-date" value="${e.date_epreuve || ''}"></div>
       <div><label>Heure</label><input type="time" id="edit-ev-heure" value="${e.heure || ''}"></div>
       <div id="edit-ev-engagement-wrap" style="${sansEng ? 'display:none' : ''}"><label>Temps engagement</label><input type="text" id="edit-ev-engagement" value="${esc(e.temps_engagement)}" placeholder="58.42"></div>
-      <div id="edit-ev-ranking-wrap" style="${isComen ? '' : 'display:none'}"><label>Rang initial <small style="font-weight:400;color:var(--muted)">(avant compét.)</small></label><input type="number" id="edit-ev-ranking" value="${e.ranking_initial != null ? e.ranking_initial : ''}" placeholder="12" min="1"></div>
+      <div id="edit-ev-ranking-wrap"><label>Rang initial <small style="font-weight:400;color:var(--muted)">(avant compét.)</small></label><input type="number" id="edit-ev-ranking" value="${e.ranking_initial != null ? e.ranking_initial : ''}" placeholder="12" min="1"></div>
     </div>`;
 
   openEditModal('Modifier l\'épreuve', id, html, saveEditEvent);
