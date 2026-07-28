@@ -2082,11 +2082,9 @@ function renderRapportFinal() {
     const placesGagnees = avecRanking.map(r => r.events.ranking_initial - r.rang).filter(d => d > 0);
     const moyPlacesGagnees = placesGagnees.length ? (placesGagnees.reduce((a,b)=>a+b,0)/placesGagnees.length).toFixed(1) : null;
 
-    // Eau Libre : classement final uniquement (podiums, top 10, taux de classement)
+    // Eau Libre : classement final uniquement (podiums, top 10)
     const resultsClassesEL = allResults.filter(r => r.a_nage && r.rang != null);
     const nbClassesEL = resultsClassesEL.length;
-    const totalEngagesEL = allEvents.length;
-    const pctClassesEL = totalEngagesEL > 0 ? Math.round(nbClassesEL / totalEngagesEL * 100) : null;
     const nbTop10EL = resultsClassesEL.filter(r => r.rang <= 10).length;
     const nbPlacesGagnees = placesGagnees.reduce((a,b)=>a+b,0);
 
@@ -2237,6 +2235,11 @@ function renderRapportFinal() {
     el.innerHTML = `
       <div style="max-width:1000px;margin:0 auto;padding:2rem">
 
+        <!-- Bouton d'export (exclu du PDF généré) -->
+        <div id="rapport-export-bar" style="display:flex;justify-content:flex-end;margin-bottom:1rem">
+          <button onclick="exportDashboardPDF()" style="background:var(--blue-light);color:#fff;border:none;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px">📥 Exporter en PDF</button>
+        </div>
+
         <!-- Header -->
         <div style="text-align:center;margin-bottom:2.5rem;padding-bottom:2rem;border-bottom:2px solid var(--border)">
           <div style="display:inline-block;background:var(--navy);color:#fff;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.08em;margin-bottom:12px;text-transform:uppercase">
@@ -2261,15 +2264,13 @@ function renderRapportFinal() {
           </h2>
           ${isEauLibre ? `
           <!-- Eau Libre : ni temps de référence ni ranking initial pertinents — seul le rang final compte -->
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:1rem">
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:1rem">
             ${kpiCard('Podiums', totOrR + totArgentR + totBronzeR, 'toutes épreuves', '#C9A227')}
             ${kpiCard('Top 10', nbTop10EL, `sur ${nbClassesEL} classé(s)`, '#1B4F8A')}
-            ${kpiCard('Classés', fmtPct(pctClassesEL), `${nbClassesEL} sur ${totalEngagesEL} épreuve(s)`, '#1A7A4A')}
           </div>
           <div style="font-size:12px;line-height:1.7;color:var(--text);background:var(--surface2);border-radius:8px;padding:12px">
             <strong>${totOrR + totArgentR + totBronzeR}</strong> podium(s) dont <strong>${totOrR}</strong> médaille(s) d'or.
-            ${nbTop10EL ? `<strong>${nbTop10EL}</strong> résultat(s) classé(s) dans le top 10. ` : ''}
-            <strong>${nbClassesEL}</strong> nageur(s) classé(s) sur <strong>${totalEngagesEL}</strong> épreuve(s) engagée(s) (${fmtPct(pctClassesEL)}).
+            ${nbTop10EL ? `<strong>${nbTop10EL}</strong> résultat(s) classé(s) dans le top 10.` : ''}
           </div>
           ${medaillesHtml}
           ` : isSerieTour ? `
@@ -2808,8 +2809,13 @@ function exportDashboardPDF() {
   const wasHidden = element.style.display === 'none';
   if (wasHidden) element.style.display = '';
 
+  // Masquer le bouton d'export lui-même pendant la capture (ne doit pas apparaître dans le PDF)
+  const exportBar = document.getElementById('rapport-export-bar');
+  if (exportBar) exportBar.style.display = 'none';
+
   html2pdf().set(opt).from(element).save().then(() => {
     if (wasHidden) element.style.display = 'none';
+    if (exportBar) exportBar.style.display = '';
   });
 }
 
