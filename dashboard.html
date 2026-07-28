@@ -2116,7 +2116,7 @@ function renderRapportFinal() {
     const totBronzeR = medalistesR.reduce((s,m)=>s+m.bronze.length,0);
     const renderMedSectionR = (list, titre) => {
       if (!list.length) return '';
-      const rows = list.map((m,i) => `<tr style="background:${i%2?'var(--surface2)':'var(--surface)'}">
+      const rows = list.map((m,i) => `<tr style="background:${i%2?'var(--surface2)':'var(--surface)'};page-break-inside:avoid;break-inside:avoid">
         <td style="padding:5px 8px;font-weight:600">${m.label}${m.isRelay ? ' <span style="font-size:9px;background:#EBF0F8;color:var(--blue);padding:1px 4px;border-radius:8px">RELAIS</span>' : ''}</td>
         <td style="padding:5px 8px;text-align:center;font-size:13px">${m.or.length ? '🥇'.repeat(m.or.length) : '—'}</td>
         <td style="padding:5px 8px;text-align:center;font-size:13px">${m.argent.length ? '🥈'.repeat(m.argent.length) : '—'}</td>
@@ -2124,7 +2124,7 @@ function renderRapportFinal() {
         <td style="padding:5px 8px;color:var(--muted)">${[...m.or,...m.argent,...m.bronze].join(', ')}</td>
       </tr>`).join('');
       const tot = list.reduce((acc,m)=>({or:acc.or+m.or.length,argent:acc.argent+m.argent.length,bronze:acc.bronze+m.bronze.length}),{or:0,argent:0,bronze:0});
-      return `<tr style="background:var(--surface2)"><td colspan="5" style="padding:4px 8px;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">${titre} — 🥇 ${tot.or} · 🥈 ${tot.argent} · 🥉 ${tot.bronze}</td></tr>${rows}`;
+      return `<tr style="background:var(--surface2);page-break-inside:avoid;break-inside:avoid"><td colspan="5" style="padding:4px 8px;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">${titre} — 🥇 ${tot.or} · 🥈 ${tot.argent} · 🥉 ${tot.bronze}</td></tr>${rows}`;
     };
     const genresSummary = (() => {
       const groups = [
@@ -2144,12 +2144,14 @@ function renderRapportFinal() {
     })();
     const medaillesHtml = medalistesR.length ? `
       <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
-        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">
-          Tableau des médailles — 🥇 ${totOrR} · 🥈 ${totArgentR} · 🥉 ${totBronzeR}
+        <div style="page-break-inside:avoid;break-inside:avoid">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">
+            Tableau des médailles — 🥇 ${totOrR} · 🥈 ${totArgentR} · 🥉 ${totBronzeR}
+          </div>
+          ${genresSummary}
         </div>
-        ${genresSummary}
         <table style="width:100%;border-collapse:collapse;font-size:11px">
-          <thead><tr style="background:var(--surface2)">
+          <thead><tr style="background:var(--surface2);page-break-inside:avoid;break-inside:avoid">
             <th style="padding:5px 8px;text-align:left;color:var(--muted);font-weight:600">Nageur / Relais</th>
             <th style="padding:5px 8px;text-align:center">🥇</th>
             <th style="padding:5px 8px;text-align:center">🥈</th>
@@ -2241,7 +2243,7 @@ function renderRapportFinal() {
         </div>
 
         <!-- Header -->
-        <div style="text-align:center;margin-bottom:2.5rem;padding-bottom:2rem;border-bottom:2px solid var(--border)">
+        <div style="text-align:center;margin-bottom:2.5rem;padding-bottom:2rem;border-bottom:2px solid var(--border);page-break-inside:avoid;break-inside:avoid">
           <div style="display:inline-block;background:var(--navy);color:#fff;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.08em;margin-bottom:12px;text-transform:uppercase">
             ${comp.type_competition || 'Compétition internationale'}
           </div>
@@ -2264,40 +2266,46 @@ function renderRapportFinal() {
           </h2>
           ${isEauLibre ? `
           <!-- Eau Libre : ni temps de référence ni ranking initial pertinents — seul le rang final compte -->
-          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:1rem">
-            ${kpiCard('Podiums', totOrR + totArgentR + totBronzeR, 'toutes épreuves', '#C9A227')}
-            ${kpiCard('Top 10', nbTop10EL, `sur ${nbClassesEL} classé(s)`, '#1B4F8A')}
-          </div>
-          <div style="font-size:12px;line-height:1.7;color:var(--text);background:var(--surface2);border-radius:8px;padding:12px">
-            <strong>${totOrR + totArgentR + totBronzeR}</strong> podium(s) dont <strong>${totOrR}</strong> médaille(s) d'or.
-            ${nbTop10EL ? `<strong>${nbTop10EL}</strong> résultat(s) classé(s) dans le top 10.` : ''}
+          <div style="page-break-inside:avoid;break-inside:avoid">
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:1rem">
+              ${kpiCard('Podiums', totOrR + totArgentR + totBronzeR, 'toutes épreuves', '#C9A227')}
+              ${kpiCard('Top 10', nbTop10EL, `sur ${nbClassesEL} classé(s)`, '#1B4F8A')}
+            </div>
+            <div style="font-size:12px;line-height:1.7;color:var(--text);background:var(--surface2);border-radius:8px;padding:12px">
+              <strong>${totOrR + totArgentR + totBronzeR}</strong> podium(s) dont <strong>${totOrR}</strong> médaille(s) d'or.
+              ${nbTop10EL ? `<strong>${nbTop10EL}</strong> résultat(s) classé(s) dans le top 10.` : ''}
+            </div>
           </div>
           ${medaillesHtml}
           ` : isSerieTour ? `
           <!-- COMEN : classement au temps, pas de tours -->
-          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:1rem">
-            ${kpiCard('Minima battus', fmtPct(stats.pctEngagement), `${stats.engagementBattus} sur ${stats.totalAvecEngagement} épreuves`, '#1B4F8A')}
-            ${kpiCard('Places gagnées', nbPlacesGagnees > 0 ? '+' + nbPlacesGagnees : '—', moyPlacesGagnees ? `Moy. +${moyPlacesGagnees} par nageur` : 'vs ranking initial', '#1A7A4A')}
-          </div>
-          <div style="font-size:12px;line-height:1.7;color:var(--text);background:var(--surface2);border-radius:8px;padding:12px">
-            Sur <strong>${stats.totalAvecEngagement}</strong> épreuve(s) avec temps de référence,
-            <strong>${stats.engagementBattus}</strong> minima ${stats.engagementBattus > 1 ? 'ont été battus' : 'a été battu'} (<strong>${fmtPct(stats.pctEngagement)}</strong>).
-            ${avecRanking.length ? `Sur <strong>${avecRanking.length}</strong> nageur(s) avec ranking initial, <strong>${placesGagnees.length}</strong> ont progressé dans le classement${moyPlacesGagnees ? ` (moy. +${moyPlacesGagnees} place${parseFloat(moyPlacesGagnees)>1?'s':''})` : ''}.` : ''}
+          <div style="page-break-inside:avoid;break-inside:avoid">
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:1rem">
+              ${kpiCard('Minima battus', fmtPct(stats.pctEngagement), `${stats.engagementBattus} sur ${stats.totalAvecEngagement} épreuves`, '#1B4F8A')}
+              ${kpiCard('Places gagnées', nbPlacesGagnees > 0 ? '+' + nbPlacesGagnees : '—', moyPlacesGagnees ? `Moy. +${moyPlacesGagnees} par nageur` : 'vs ranking initial', '#1A7A4A')}
+            </div>
+            <div style="font-size:12px;line-height:1.7;color:var(--text);background:var(--surface2);border-radius:8px;padding:12px">
+              Sur <strong>${stats.totalAvecEngagement}</strong> épreuve(s) avec temps de référence,
+              <strong>${stats.engagementBattus}</strong> minima ${stats.engagementBattus > 1 ? 'ont été battus' : 'a été battu'} (<strong>${fmtPct(stats.pctEngagement)}</strong>).
+              ${avecRanking.length ? `Sur <strong>${avecRanking.length}</strong> nageur(s) avec ranking initial, <strong>${placesGagnees.length}</strong> ont progressé dans le classement${moyPlacesGagnees ? ` (moy. +${moyPlacesGagnees} place${parseFloat(moyPlacesGagnees)>1?'s':''})` : ''}.` : ''}
+            </div>
           </div>
           ${medaillesHtml}
           ` : `
           <!-- Format standard avec tours -->
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1rem">
-            ${kpiCard('Demi-finales', fmtPct(stats.pctDF), `${stats.nbDF} nageur(s) qualifié(s)`, '#2563C4')}
-            ${kpiCard('Finales', fmtPct(stats.pctFinale), `${stats.nbFinale} nageur(s)`, '#E8632A')}
-            ${kpiCard('Podiums', fmtPct(stats.pctPodium), `${stats.nbPodium} médaille(s)`, '#1A7A4A')}
-            ${kpiCard('Minima battus', fmtPct(stats.pctEngagement), `${stats.engagementBattus}/${stats.totalAvecEngagement} épreuves`, '#F0A500')}
-          </div>
-          <div style="font-size:12px;line-height:1.7;color:var(--text);background:var(--surface2);border-radius:8px;padding:12px">
-            ${stats.nbDF > 0 ? `<strong>${stats.nbDF}</strong> nageur(s) ont atteint les demi-finales (${fmtPct(stats.pctDF)}). ` : ''}
-            ${stats.nbFinale > 0 ? `<strong>${stats.nbFinale}</strong> ont disputé une finale (${fmtPct(stats.pctFinale)}). ` : ''}
-            ${stats.nbPodium > 0 ? `<strong>${stats.nbPodium}</strong> podium(s) — ${fmtPct(stats.pctPodium)} des finalistes. ` : ''}
-            ${stats.totalAvecEngagement > 0 ? `Minima battus : <strong>${stats.engagementBattus}</strong> sur <strong>${stats.totalAvecEngagement}</strong> épreuves (${fmtPct(stats.pctEngagement)}).` : ''}
+          <div style="page-break-inside:avoid;break-inside:avoid">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1rem">
+              ${kpiCard('Demi-finales', fmtPct(stats.pctDF), `${stats.nbDF} nageur(s) qualifié(s)`, '#2563C4')}
+              ${kpiCard('Finales', fmtPct(stats.pctFinale), `${stats.nbFinale} nageur(s)`, '#E8632A')}
+              ${kpiCard('Podiums', fmtPct(stats.pctPodium), `${stats.nbPodium} médaille(s)`, '#1A7A4A')}
+              ${kpiCard('Minima battus', fmtPct(stats.pctEngagement), `${stats.engagementBattus}/${stats.totalAvecEngagement} épreuves`, '#F0A500')}
+            </div>
+            <div style="font-size:12px;line-height:1.7;color:var(--text);background:var(--surface2);border-radius:8px;padding:12px">
+              ${stats.nbDF > 0 ? `<strong>${stats.nbDF}</strong> nageur(s) ont atteint les demi-finales (${fmtPct(stats.pctDF)}). ` : ''}
+              ${stats.nbFinale > 0 ? `<strong>${stats.nbFinale}</strong> ont disputé une finale (${fmtPct(stats.pctFinale)}). ` : ''}
+              ${stats.nbPodium > 0 ? `<strong>${stats.nbPodium}</strong> podium(s) — ${fmtPct(stats.pctPodium)} des finalistes. ` : ''}
+              ${stats.totalAvecEngagement > 0 ? `Minima battus : <strong>${stats.engagementBattus}</strong> sur <strong>${stats.totalAvecEngagement}</strong> épreuves (${fmtPct(stats.pctEngagement)}).` : ''}
+            </div>
           </div>
           ${medaillesHtml}
           `}
@@ -2309,7 +2317,7 @@ function renderRapportFinal() {
             <span style="display:inline-block;width:3px;height:16px;background:var(--teal);border-radius:2px"></span>
             Phase de préparation
           </h2>
-          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem">
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem;page-break-inside:avoid;break-inside:avoid">
             ${precompData ? `
               <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:${precompData.objectifs_groupe ? '1rem' : '0'}">
                 ${svgGauge(precompData.groupe_forme_generale, 5, null, 'Forme groupe')}
@@ -2328,7 +2336,7 @@ function renderRapportFinal() {
             <span style="display:inline-block;width:3px;height:16px;background:var(--accent);border-radius:2px"></span>
             Phase de compétition
           </h2>
-          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem">
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem;page-break-inside:avoid;break-inside:avoid">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
               <div>
                 <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Dynamique d'équipe</div>
@@ -2355,7 +2363,7 @@ function renderRapportFinal() {
           </h2>
           <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
             <table style="width:100%;border-collapse:collapse;font-size:12px">
-              <thead><tr style="background:var(--surface2)">
+              <thead><tr style="background:var(--surface2);page-break-inside:avoid;break-inside:avoid">
                 <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--muted);font-weight:600">Nageur</th>
                 <th style="padding:8px 12px;text-align:center;font-size:11px;color:var(--muted);font-weight:600">Épreuves</th>
                 <th style="padding:8px 12px;text-align:center;font-size:11px;color:var(--muted);font-weight:600">% réf. battus</th>
@@ -2388,7 +2396,7 @@ function renderRapportFinal() {
                       const delta = withRk.reduce((s, r) => s + (r.events.ranking_initial - r.rang), 0);
                       return withRk.length ? (delta > 0 ? `<span style="color:var(--success);font-weight:600">+${delta}</span>` : delta < 0 ? `<span style="color:var(--error)">${delta}</span>` : '<span style="color:var(--muted)">0</span>') : '—';
                     })() : null;
-                    return `<tr style="background:${idx%2?'var(--surface2)':'var(--surface)'}">
+                    return `<tr style="background:${idx%2?'var(--surface2)':'var(--surface)'};page-break-inside:avoid;break-inside:avoid">
                       <td style="padding:8px 12px;font-weight:600;color:var(--navy)">${name}</td>
                       <td style="padding:8px 12px;text-align:center">${nage.length}</td>
                       <td style="padding:8px 12px;text-align:center;font-family:'DM Mono',monospace">${pctRef}</td>
@@ -2418,7 +2426,7 @@ function renderRapportFinal() {
               const encRows = [['Communication staff ↔ nageurs','enc_communication'],['Cohésion interne du staff','enc_cohesion'],['Relation avec l\'organisation','enc_relation_orga'],['Gestion des imprévus','enc_gestion_imprevus']];
               return `
               <!-- Bilan par domaine + Encadrement -->
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1rem">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1rem;page-break-inside:avoid;break-inside:avoid">
                 <div>
                   <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Bilan par domaine</div>
                   ${bilanRows.map(([lbl,k]) => `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
@@ -2437,7 +2445,7 @@ function renderRapportFinal() {
               </div>
               <!-- Points forts / à améliorer -->
               ${e.points_forts || e.points_ameliorer ? `
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;padding-top:1rem;border-top:1px solid var(--border)">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;padding-top:1rem;border-top:1px solid var(--border);page-break-inside:avoid;break-inside:avoid">
                 ${e.points_forts ? `<div>
                   <div style="font-size:11px;font-weight:600;color:var(--success);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Points forts</div>
                   <div style="font-size:12px;color:var(--text);line-height:1.6">${e.points_forts}</div>
@@ -2449,7 +2457,7 @@ function renderRapportFinal() {
               </div>` : ''}
               <!-- Recommandations -->
               ${e.recommandations_sport || e.recommandations_orga ? `
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;padding-top:1rem;border-top:1px solid var(--border)">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;padding-top:1rem;border-top:1px solid var(--border);page-break-inside:avoid;break-inside:avoid">
                 ${e.recommandations_sport ? `<div>
                   <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Recommandations sportives</div>
                   <div style="font-size:12px;color:var(--text);line-height:1.6">${e.recommandations_sport}</div>
@@ -2461,7 +2469,7 @@ function renderRapportFinal() {
               </div>` : ''}
               <!-- Conclusions DTN -->
               ${e.conclusions_dtn ? `
-              <div style="background:var(--surface2);border-radius:8px;padding:12px;border-left:3px solid var(--teal);margin-top:1rem">
+              <div style="background:var(--surface2);border-radius:8px;padding:12px;border-left:3px solid var(--teal);margin-top:1rem;page-break-inside:avoid;break-inside:avoid">
                 <div style="font-size:11px;font-weight:600;color:var(--teal);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Conclusions DTN</div>
                 <div style="font-size:12px;color:var(--text);line-height:1.6">${e.conclusions_dtn}</div>
               </div>` : ''}
@@ -2480,14 +2488,14 @@ function renderRapportFinal() {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
             ${['aller','retour'].map(type => {
               const entries = allVoyageEntries.filter(e => e.type_journee === type);
-              if (!entries.length) return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Voyage ${type}</div><div style="color:var(--hint);font-size:12px">Aucune donnée</div></div>`;
+              if (!entries.length) return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem;page-break-inside:avoid;break-inside:avoid"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Voyage ${type}</div><div style="color:var(--hint);font-size:12px">Aucune donnée</div></div>`;
               const avgForme = entries.map(e => [e.forme_physique, e.forme_psychologique].filter(Boolean)).flat();
               const moyForme = avgForme.length ? (avgForme.reduce((a,b)=>a+b,0)/avgForme.length).toFixed(1) : null;
               const avgQV = entries.filter(e=>e.qualite_voyage).map(e=>e.qualite_voyage);
               const moyQV = avgQV.length ? (avgQV.reduce((a,b)=>a+b,0)/avgQV.length).toFixed(1) : null;
               const pbAdmins = entries.filter(e => e.probleme_admin && e.probleme_admin.toLowerCase() === 'oui');
               const col = v => !v ? 'var(--hint)' : parseFloat(v) >= 4 ? 'var(--success)' : parseFloat(v) >= 3 ? 'var(--accent2)' : 'var(--error)';
-              return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem">
+              return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem;page-break-inside:avoid;break-inside:avoid">
                 <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Voyage ${type} (${entries.length} saisie${entries.length>1?'s':''})</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
                   <div style="text-align:center">
@@ -2514,7 +2522,7 @@ function renderRapportFinal() {
         </div>` : ''}
 
         <!-- Footer -->
-        <div style="text-align:center;padding:1.5rem 0;border-top:1px solid var(--border);color:var(--hint);font-size:11px;letter-spacing:.04em">
+        <div style="text-align:center;padding:1.5rem 0;border-top:1px solid var(--border);color:var(--hint);font-size:11px;letter-spacing:.04em;page-break-inside:avoid;break-inside:avoid">
           FFN · Journal de compétition · Rapport généré le ${new Date().toLocaleDateString('fr-FR')}
         </div>
 
@@ -2797,12 +2805,18 @@ function exportDashboardPDF() {
     return;
   }
 
+  // Le rapport final est une mise en page verticale à colonne unique : le format
+  // portrait (plus haut) réduit fortement le nombre de sauts de page par rapport
+  // au format paysage utilisé pour les tableaux larges des autres onglets.
+  const isRapport = currentTab === 'rapport';
+
   const opt = {
     margin: 10,
     filename: `Dashboard_${tabName.replace(/\\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`,
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 1.5 },
-    jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4' }
+    jsPDF: { orientation: isRapport ? 'portrait' : 'landscape', unit: 'mm', format: 'a4' },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
   };
 
   // Temporarily show element if hidden
