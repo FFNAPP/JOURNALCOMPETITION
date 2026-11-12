@@ -15,7 +15,7 @@ Application web **statique** (HTML/CSS/JS vanilla) hébergée sur GitHub Pages, 
 | Branche | `main` (branches de travail Claude Code web : `claude/...`, fusionnées dans `main`) |
 | Dossier local | `/Users/pierre.hui/Desktop/Relève-Perf32/JOURNALCOMPETITION` |
 | Hébergement | GitHub Pages (adresse `[À VÉRIFIER]`) |
-| Supabase | `https://wvxgkadxqzftjrtxotuw.supabase.co` (URL et clé anon dans `assets/auth.js`) |
+| Supabase | `<URL du projet Supabase : voir assets/auth.js>` (URL et clé anon dans `assets/auth.js`) |
 | Ancien dossier | `/Users/pierre.hui/Desktop/Relève-Perf32/Journal de competition` — copie de travail périmée, à ne pas utiliser pour le code (voir historique, section 4) |
 
 ## 3. Structure et fichiers clés
@@ -157,3 +157,11 @@ ALTER TABLE voyage_entries
 ---
 
 Détail complet (récit des sessions, historique git, comparaison avec l'ancien dossier, contradictions, points à vérifier, copie du CLAUDE.md d'origine) : voir `docs/historique-claude.md`.
+
+## Décisions de Pierre du 2026-11-12 (réponses aux questions ouvertes)
+Complète et remplace les [À VÉRIFIER] correspondants ci-dessus. « Fait » = exécuté le 2026-11-12 ; « À faire » = décidé, non exécuté.
+- Dépôt PUBLIC ; GitHub Pages : https://ffnapp.github.io/JOURNALCOMPETITION/dashboard.html ; Pierre est le seul contributeur. L'URL et l'identifiant du projet Supabase sont masqués dans ces fichiers (à pousser).
+- Ancien projet Supabase : inactif. La clé anon de l'ancien projet, présente dans l'ancien dossier `Journal de competition`, est à révoquer (action de Pierre dans Supabase).
+- RLS activée partout et migrations SQL passées.
+- Documents à verser dans le dépôt : `gestion-utilisateurs-ffn.txt`, `NOTE_detectPhase_v2.md`, `instructions_claude_code.md` (pas `COMEN_engagements.csv`, noms de nageurs). À FAIRE.
+- Branche distante `claude/friendly-allen-4v743x` (déjà fusionnée) : À SUPPRIMER ; non fait.

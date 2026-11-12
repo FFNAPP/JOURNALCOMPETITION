@@ -201,7 +201,7 @@ html2pdf.js 0.10.1 chargé depuis cdnjs dans `journal.html` et `dashboard.html`.
 
 ## 6. Pistes abandonnées et contradictions tranchées
 
-- **Projet Supabase** : les sessions de mai-juin 2026, le brief d'authentification et les fichiers `journal_sauvegarde.html` / `dashboard-2.html` pointent vers un premier projet (`bpdxdljctybdmtemubjh`). Le code actuel (`assets/auth.js`) et le CLAUDE.md d'origine pointent vers `wvxgkadxqzftjrtxotuw`. Le plus récent fait foi. La date et la raison du changement de projet ne sont pas documentées `[À VÉRIFIER]`.
+- **Projet Supabase** : les sessions de mai-juin 2026, le brief d'authentification et les fichiers `journal_sauvegarde.html` / `dashboard-2.html` pointent vers un premier projet (`<identifiant masqué>`). Le code actuel (`assets/auth.js`) et le CLAUDE.md d'origine pointent vers `<identifiant masqué>`. Le plus récent fait foi. La date et la raison du changement de projet ne sont pas documentées `[À VÉRIFIER]`.
 - **Colonnes voyage** : la session du 2026-06-02 annonçait `embarquement_nc`, `attente_retard`, `pb_administratif`, `pb_administratif_obs`. Le code actuel et le CLAUDE.md d'origine utilisent `embarquement` (entier, nul si non concerné), `attente`, `probleme_admin` ('Oui'/'Non'), `probleme_admin_obs`. Les noms actuels font foi.
 - **Checklist administrative pré-comp staff** : ajoutée (v2) puis retirée (v3) le 2026-05-29. Le CLAUDE.md d'origine mentionne pourtant des colonnes `log_convocations … log_creneaux_entrainement` dans `precomp_staff_entries` et le commit `4afbef7` cite une rubrique « logistique » du pré-comp staff : la présence actuelle de cette checklist dans le formulaire est `[À VÉRIFIER]`.
 - **Catégorie « sportif » du journal staff** : retirée du formulaire le 2026-05-29 (v3). Le CLAUDE.md d'origine décrit encore « scores logistique/sportif/vie de groupe » pour `staff_entries` `[À VÉRIFIER]`.
@@ -247,7 +247,7 @@ Application web **statique** (HTML/CSS/JS vanilla) hébergée sur GitHub Pages, 
 
 **Dépôt** : `ffnapp/journalcompetition`  
 **Branche de développement** : `claude/dazzling-babbage-fz6fzr`  
-**Supabase** : `https://wvxgkadxqzftjrtxotuw.supabase.co`
+**Supabase** : `<URL du projet Supabase : voir assets/auth.js>`
 
 ---
 
@@ -478,3 +478,11 @@ let allVoyageEntries = [], allPrecompEntries = [];
 - Si le push est bloqué (403), livrer les fichiers via `SendUserFile`.
 
 ~~~~
+
+## Décisions de Pierre du 2026-11-12 (réponses aux questions ouvertes)
+Complète et remplace les [À VÉRIFIER] correspondants ci-dessus. « Fait » = exécuté le 2026-11-12 ; « À faire » = décidé, non exécuté.
+- Dépôt PUBLIC ; GitHub Pages : https://ffnapp.github.io/JOURNALCOMPETITION/dashboard.html ; Pierre est le seul contributeur. L'URL et l'identifiant du projet Supabase sont masqués dans ces fichiers (à pousser).
+- Ancien projet Supabase : inactif. La clé anon de l'ancien projet, présente dans l'ancien dossier `Journal de competition`, est à révoquer (action de Pierre dans Supabase).
+- RLS activée partout et migrations SQL passées.
+- Documents à verser dans le dépôt : `gestion-utilisateurs-ffn.txt`, `NOTE_detectPhase_v2.md`, `instructions_claude_code.md` (pas `COMEN_engagements.csv`, noms de nageurs). À FAIRE.
+- Branche distante `claude/friendly-allen-4v743x` (déjà fusionnée) : À SUPPRIMER ; non fait.
